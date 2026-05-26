@@ -70,6 +70,14 @@ const RunsPage = () => {
 
   const showCompare = compareIds.length >= 2;
 
+  const allEvents = runs.flatMap((run) => run.result || []);
+
+const numberOfEvents = allEvents.length;
+const numberOfCases = new Set(allEvents.map((event) => event.case_id)).size;
+const numberOfActivities = new Set(allEvents.map((event) => event.activity)).size;
+const averageEventsPerCase =
+  numberOfCases > 0 ? (numberOfEvents / numberOfCases).toFixed(2) : 0;
+
   return (
     <div className="space-y-6">
       <RunListHeader onRefresh={onRefresh} refreshing={refreshing} />
@@ -121,21 +129,46 @@ const RunsPage = () => {
             </Button>
           }
         />
-      ) : (
-        <div className="space-y-3">
-          {runs.map((run) => {
-            const selected = selectedIds.has(run.id);
-            const selectable = selected || selectedIds.size < MAX_SELECTION;
-            return (
-              <RunCard
-                key={run.id}
-                run={run}
-                selected={selected}
-                selectable={selectable}
-                onSelectChange={(checked) => toggleSelect(run.id, checked)}
-              />
-            );
-          })}
+          ) : (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200">
+              <p className="text-sm text-gray-500">Cases</p>
+              <p className="mt-2 text-2xl font-bold">{numberOfCases}</p>
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200">
+              <p className="text-sm text-gray-500">Events</p>
+              <p className="mt-2 text-2xl font-bold">{numberOfEvents}</p>
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200">
+              <p className="text-sm text-gray-500">Activities</p>
+              <p className="mt-2 text-2xl font-bold">{numberOfActivities}</p>
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200">
+              <p className="text-sm text-gray-500">Avg. events / case</p>
+              <p className="mt-2 text-2xl font-bold">{averageEventsPerCase}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {runs.map((run) => {
+              const selected = selectedIds.has(run.id);
+              const selectable = selected || selectedIds.size < MAX_SELECTION;
+
+              return (
+                <RunCard
+                  key={run.id}
+                  run={run}
+                  selected={selected}
+                  selectable={selectable}
+                  onSelectChange={(checked) => toggleSelect(run.id, checked)}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
