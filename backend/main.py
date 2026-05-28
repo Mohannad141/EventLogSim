@@ -1,7 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+
+from routers.runs import router as runs_router
 
 app = FastAPI()
+
+app.include_router(runs_router, prefix="/api", tags=["runs"])
+
+def main():
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,20 +26,6 @@ app.add_middleware(
 def root():
     return {"message": "Backend works"}
 
-@app.get("/api/runs")
-def get_runs():
-    return [
-        {
-            "id": "run_1",
-            "status": "completed",
-            "created_at": "2026-05-25",
-            "result": [
-                {"case_id": "case_1", "activity": "A", "timestamp": 1},
-                {"case_id": "case_1", "activity": "B", "timestamp": 2},
-                {"case_id": "case_1", "activity": "C", "timestamp": 3},
-                {"case_id": "case_2", "activity": "A", "timestamp": 1},
-                {"case_id": "case_2", "activity": "D", "timestamp": 2},
-                {"case_id": "case_3", "activity": "B", "timestamp": 1},
-            ],
-        }
-    ]
+
+if __name__ == "__main__":
+    main()
