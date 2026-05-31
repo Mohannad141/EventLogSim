@@ -1,6 +1,7 @@
 import {
   BarChart,
   Bar,
+  Cell,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -10,6 +11,14 @@ import {
 } from 'recharts';
 
 const DEFAULT_COLOR = '#6366f1';
+const COLORS = [
+  '#A8D8EA',
+  '#AAE3A1',
+  '#FFD3B6',
+  '#FFAAA5',
+  '#D5AAFF',
+  '#B5EAD7',
+];
 
 const EventDistributionChart = ({
   data = [],
@@ -62,11 +71,16 @@ const EventDistributionChart = ({
             ))
           ) : (
             <Bar
-              dataKey="count"
-              name="Events"
-              fill={DEFAULT_COLOR}
-              radius={[4, 4, 0, 0]}
-            />
+  dataKey="count"
+  radius={[4, 4, 0, 0]}
+>
+  {data.map((entry, index) => (
+    <Cell
+      key={`cell-${index}`}
+      fill={COLORS[index % COLORS.length]}
+    />
+  ))}
+</Bar>
           )}
         </BarChart>
       </ResponsiveContainer>
