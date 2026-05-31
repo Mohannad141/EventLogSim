@@ -9,7 +9,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const DEFAULT_COLOR = '#10b981';
+const DEFAULT_COLOR = '#A8D8EA';
+
 
 const SingleAttributeChart = ({ attribute, height = 220 }) => {
   const data = (attribute.values || []).map((v) => ({

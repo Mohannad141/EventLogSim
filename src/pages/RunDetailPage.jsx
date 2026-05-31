@@ -103,23 +103,41 @@ const RunDetailPage = () => {
             />
           </Card>
 
-          <Card>
-            <h2 className="mb-3 text-lg font-semibold text-gray-900">
-              Event Distribution
-            </h2>
-            <EventDistributionChart
-              data={run.stats?.eventDistribution || []}
-            />
-          </Card>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+  <Card>
+    <h2 className="mb-3 text-lg font-semibold text-gray-900">
+      Event Distribution
+    </h2>
+    <EventDistributionChart
+      data={run.stats?.eventDistribution || []}
+    />
+  </Card>
 
-          <Card>
-            <h2 className="mb-3 text-lg font-semibold text-gray-900">
-              Attribute Distribution
-            </h2>
-            <AttributeDistributionChart
-              attributes={run.stats?.attributeDistribution || []}
-            />
-          </Card>
+  <Card>
+    <h2 className="mb-3 text-lg font-semibold text-gray-900">
+      Attribute Distribution
+    </h2>
+
+    <AttributeDistributionChart
+      attributes={
+        run.stats?.attributeDistribution?.length
+          ? run.stats.attributeDistribution
+          : [
+              {
+                name: 'Role',
+                values: Object.entries(
+                  (run.events || []).reduce((acc, event) => {
+                    const role = event.role || 'Unknown';
+                    acc[role] = (acc[role] || 0) + 1;
+                    return acc;
+                  }, {})
+                ).map(([value, count]) => ({ value, count })),
+              },
+            ]
+      }
+    />
+  </Card>
+</div>
 
           <Card>
             <h2 className="mb-3 text-lg font-semibold text-gray-900">

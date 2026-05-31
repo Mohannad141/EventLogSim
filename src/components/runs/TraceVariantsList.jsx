@@ -52,8 +52,10 @@ const TraceVariantsList = ({
             <span className="mt-0.5 inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200">
               {i + 1}
             </span>
-            <div className="min-w-0 text-sm">{renderSequence(variant.sequence)}</div>
-          </div>
+            <div className="min-w-0 text-sm">
+              {renderSequence(variant.sequence || variant.activities || [])}
+            </div>
+            </div>
           <div className="flex-none whitespace-nowrap text-xs text-gray-600">
             {formatNumber(variant.count)} cases
             {typeof variant.percentage === 'number' && (

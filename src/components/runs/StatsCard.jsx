@@ -28,12 +28,9 @@ const StatsCard = ({ stats = {}, compact = false, className }) => {
     { label: 'Events', value: formatNumber(stats.eventCount) || '—' },
     { label: 'Variants', value: formatNumber(stats.variantCount) || '—' },
     {
-      label: 'Duration',
-      value:
-        stats.duration != null && Number.isFinite(stats.duration)
-          ? formatDuration(stats.duration)
-          : '—',
-    },
+  label: 'Duration',
+  value: stats.duration || '—',
+},
   ];
 
   return (
