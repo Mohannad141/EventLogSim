@@ -16,7 +16,6 @@ const SimulationStep = ({
   submitting = false,
   runDisabledReason,
   onChangeCaseCount,
-  onChangeSeed,
   onResetStep,
   onRun,
 }) => {
@@ -32,23 +31,12 @@ const SimulationStep = ({
     onChangeCaseCount(clamp(Math.round(n), MIN_CASES, MAX_CASES));
   };
 
-  const handleSeedChange = (raw) => {
-    if (raw === '' || raw === null || raw === undefined) {
-      onChangeSeed(null);
-      return;
-    }
-    const n = Number(raw);
-    onChangeSeed(Number.isFinite(n) ? n : null);
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Simulation</h2>
           <p className="mt-1 text-sm text-gray-600">
-            Set how many cases to generate and (optionally) a seed for
-            reproducibility.
           </p>
         </div>
         <Button
@@ -98,28 +86,6 @@ const SimulationStep = ({
         )}
       </div>
 
-      <div>
-        <label
-          htmlFor="seed"
-          className="block text-sm font-medium text-gray-900"
-        >
-          Random seed
-        </label>
-        <Input
-          id="seed"
-          type="number"
-          value={simulation.seed === null ? '' : String(simulation.seed)}
-          onChange={(e) => handleSeedChange(e.target.value)}
-          placeholder="e.g. 42 (optional)"
-          className="mt-2 w-48"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          When set, makes runs reproducible.
-        </p>
-        {errors.seed && (
-          <p className="mt-1 text-xs text-red-600">{errors.seed}</p>
-        )}
-      </div>
 
       <div className="flex items-center justify-end">
         <Button
@@ -146,7 +112,6 @@ const SimulationStep = ({
         open={confirmReset}
         onClose={() => setConfirmReset(false)}
         title="Reset Simulation step?"
-        message="This will reset the case count to 100 and clear the seed."
         confirmLabel="Reset"
         variant="danger"
         onConfirm={onResetStep}

@@ -18,7 +18,6 @@ const createInitialConfig = () => ({
   attributes: createEssentialAttributes(),
   simulation: {
     caseCount: 100,
-    seed: null,
   },
 });
 
@@ -163,11 +162,6 @@ export const useConfigState = () => {
     [update]
   );
 
-  const setSeed = useCallback(
-    (seed) =>
-      update((c) => ({ ...c, simulation: { ...c.simulation, seed } })),
-    [update]
-  );
 
   const resetStep = useCallback(
     (stepName) => {
@@ -206,7 +200,6 @@ export const useConfigState = () => {
     updateAttribute,
     removeAttribute,
     setCaseCount,
-    setSeed,
     resetStep,
     resetAll,
   };

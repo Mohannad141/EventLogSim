@@ -9,7 +9,7 @@ import TraceVariantsList from './TraceVariantsList.jsx';
 import { getRun } from '../../lib/api.js';
 import { formatNumber, formatDuration } from '../../utils/format.js';
 
-const PALETTE = ['#6366f1', '#10b981', '#f59e0b', '#ef4444'];
+const PALETTE = [ '#A8D8EA', '#EFAAA5','#FFD3B6', '#B5EAD7'];
 
 const buildSeries = (runs) =>
   runs.map((run, i) => ({
@@ -222,8 +222,9 @@ const ComparePanel = ({ runIds = [], onClose }) => {
               Attribute Distribution
             </h3>
             <AttributeDistributionChart
-              multi={{ runs: successfulRuns, series }}
-            />
+            multi={{ runs: successfulRuns, series }}
+           showSelector
+           />
           </section>
 
           <section>

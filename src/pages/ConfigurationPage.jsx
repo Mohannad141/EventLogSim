@@ -56,7 +56,6 @@ const ConfigurationPage = () => {
     updateAttribute,
     removeAttribute,
     setCaseCount,
-    setSeed,
     resetStep,
     resetAll,
   } = useConfigState();
@@ -169,7 +168,6 @@ const ConfigurationPage = () => {
             submitting={submitting}
             runDisabledReason={runDisabledReason}
             onChangeCaseCount={setCaseCount}
-            onChangeSeed={setSeed}
             onResetStep={() => resetStep('simulation')}
             onRun={handleRun}
           />
