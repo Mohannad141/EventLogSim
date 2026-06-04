@@ -26,7 +26,6 @@ class AttributeConfig(BaseModel):
 # 4. Simulation Settings
 class SimulationConfig(BaseModel):
     caseCount: int = Field(ge=1, le=10000) # ge = greater than or equal, le = less than or equal
-    seed: Optional[int] = None
 
 # 5. The Top-Level "Config" Object
 class SimulationRunConfig(BaseModel):

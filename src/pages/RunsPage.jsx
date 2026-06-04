@@ -8,6 +8,7 @@ import RunCard from '../components/runs/RunCard.jsx';
 import SelectionToolbar from '../components/runs/SelectionToolbar.jsx';
 import ComparePanel from '../components/runs/ComparePanel.jsx';
 import { useRuns } from '../hooks/useRuns.js';
+import ConfirmDialog from '../components/common/ConfirmDialog.jsx';
 
 const MAX_SELECTION = 4;
 
@@ -26,23 +27,25 @@ const RunsPage = () => {
 
   const [selectedIds, setSelectedIds] = useState(new Set(compareIds));
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmDeleteRuns, setConfirmDeleteRuns] = useState(false);
 
   useEffect(() => {
     setSelectedIds(new Set(compareIds));
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSelect = (id, checked) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (checked) {
-        if (next.size >= MAX_SELECTION) return prev;
-        next.add(id);
-      } else {
-        next.delete(id);
-      }
-      return next;
-    });
-  };
+  setSelectedIds((prev) => {
+    const next = new Set(prev);
+
+    if (checked) {
+      next.add(id);
+    } else {
+      next.delete(id);
+    }
+
+    return next;
+  });
+};
 
   const clearSelection = () => {
     setSelectedIds(new Set());
@@ -69,7 +72,9 @@ const RunsPage = () => {
   };
 
   const showCompare = compareIds.length >= 2;
-
+  const deleteSelectedRuns = () => {
+  setConfirmDeleteRuns(true);
+};
   const allEvents = runs.flatMap((run) => run.result || []);
 
 const numberOfEvents = allEvents.length;
@@ -89,9 +94,37 @@ const averageEventsPerCase =
       <SelectionToolbar
         selectedCount={selectedIds.size}
         onClear={clearSelection}
+        onDelete={deleteSelectedRuns}
         onCompare={openCompare}
         comparing={showCompare}
       />
+      <ConfirmDialog
+  open={confirmDeleteRuns}
+  onClose={() => setConfirmDeleteRuns(false)}
+  title="Delete selected runs?"
+  message={`Delete ${selectedIds.size} selected ${
+    selectedIds.size === 1 ? 'run' : 'runs'
+  }? This cannot be undone.`}
+  confirmLabel="Delete"
+  variant="danger"
+  onConfirm={async () => {
+  try {
+    await fetch('http://127.0.0.1:8000/api/runs', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(Array.from(selectedIds)),
+    });
+
+    await refresh();
+    clearSelection();
+    setConfirmDeleteRuns(false);
+  } catch (error) {
+    console.error('Failed to delete runs:', error);
+  }
+}}
+/>
 
       {loading && runs.length === 0 ? (
         <div className="space-y-3">
@@ -156,7 +189,7 @@ const averageEventsPerCase =
           <div className="space-y-3">
             {runs.map((run) => {
               const selected = selectedIds.has(run.id);
-              const selectable = selected || selectedIds.size < MAX_SELECTION;
+              const selectable = true;
 
               return (
                 <RunCard

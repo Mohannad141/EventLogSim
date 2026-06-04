@@ -119,22 +119,8 @@ const RunDetailPage = () => {
     </h2>
 
     <AttributeDistributionChart
-      attributes={
-        run.stats?.attributeDistribution?.length
-          ? run.stats.attributeDistribution
-          : [
-              {
-                name: 'Role',
-                values: Object.entries(
-                  (run.events || []).reduce((acc, event) => {
-                    const role = event.role || 'Unknown';
-                    acc[role] = (acc[role] || 0) + 1;
-                    return acc;
-                  }, {})
-                ).map(([value, count]) => ({ value, count })),
-              },
-            ]
-      }
+      attributes={run.stats?.attributeDistribution || []}
+     showSelector
     />
   </Card>
 </div>

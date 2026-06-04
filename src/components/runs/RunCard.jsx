@@ -47,13 +47,10 @@ const RunCard = ({
           <input
             type="checkbox"
             checked={selected}
-            disabled={checkboxDisabled}
+            disabled={false}
             onChange={handleCheckbox}
             aria-label={`Select run ${run.id}`}
-            title={
-              checkboxDisabled
-                ? 'Maximum 4 runs can be compared'
-                : undefined
+            title={undefined
             }
             className="h-4 w-4 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           />

@@ -48,7 +48,6 @@ export const validateAttributes = () => ok();
 
 export const validateSimulation = (simulation = {}) => {
   const errors = {};
-  const { caseCount, seed } = simulation;
 
   if (
     typeof caseCount !== 'number' ||
@@ -59,9 +58,6 @@ export const validateSimulation = (simulation = {}) => {
     errors.caseCount = `Number of cases must be between ${MIN_CASE_COUNT} and ${MAX_CASE_COUNT}.`;
   }
 
-  if (seed !== null && (typeof seed !== 'number' || !Number.isFinite(seed))) {
-    errors.seed = 'Seed must be a number or empty.';
-  }
 
   return Object.keys(errors).length === 0 ? ok() : fail(errors);
 };

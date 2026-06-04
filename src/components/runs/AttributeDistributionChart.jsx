@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -7,6 +8,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  
 } from 'recharts';
 
 const DEFAULT_COLOR = '#A8D8EA';
@@ -104,7 +106,9 @@ const AttributeDistributionChart = ({
   attributes = [],
   emptyMessage = 'No custom attribute distributions.',
   multi,
+  showSelector = false,
 }) => {
+  const [selectedAttribute, setSelectedAttribute] = useState('');
   if (multi) {
     const { runs, series } = multi;
     const allNames = new Set();
@@ -115,40 +119,83 @@ const AttributeDistributionChart = ({
     if (names.length === 0) {
       return <p className="text-sm text-gray-500">{emptyMessage}</p>;
     }
-    return (
-      <div className="space-y-6">
-        {names.map((name) => (
-          <div key={name}>
-            <h4 className="mb-2 text-sm font-semibold text-gray-900">
+    const activeName = selectedAttribute || names[0];
+
+return (
+  <div className="space-y-4">
+    {showSelector && (
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-gray-700">
+          Attribute:
+        </label>
+        <select
+          value={activeName}
+          onChange={(e) => setSelectedAttribute(e.target.value)}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm"
+        >
+          {names.map((name) => (
+            <option key={name} value={name}>
               {name}
-            </h4>
-            <MultiAttributeChart
-              name={name}
-              data={buildMultiAttributeData(name, runs, series)}
-              series={series}
-            />
-          </div>
-        ))}
+            </option>
+          ))}
+        </select>
       </div>
-    );
+    )}
+
+    <div>
+      <h4 className="mb-2 text-sm font-semibold text-gray-900">
+        {activeName}
+      </h4>
+      <MultiAttributeChart
+        name={activeName}
+        data={buildMultiAttributeData(activeName, runs, series)}
+        series={series}
+      />
+    </div>
+  </div>
+);
   }
 
   if (!attributes.length) {
     return <p className="text-sm text-gray-500">{emptyMessage}</p>;
   }
 
-  return (
-    <div className="space-y-6">
-      {attributes.map((attribute) => (
-        <div key={attribute.name}>
-          <h4 className="mb-2 text-sm font-semibold text-gray-900">
-            {attribute.name}
-          </h4>
-          <SingleAttributeChart attribute={attribute} />
-        </div>
-      ))}
-    </div>
-  );
+  const activeAttributeName = selectedAttribute || attributes[0].name;
+const activeAttribute = attributes.find(
+  (attribute) => attribute.name === activeAttributeName
+);
+
+return (
+  <div className="space-y-4">
+    {showSelector && (
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-gray-700">
+          Attribute:
+        </label>
+        <select
+          value={activeAttributeName}
+          onChange={(e) => setSelectedAttribute(e.target.value)}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm"
+        >
+          {attributes.map((attribute) => (
+            <option key={attribute.name} value={attribute.name}>
+              {attribute.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    )}
+
+    {activeAttribute && (
+      <div>
+        <h4 className="mb-2 text-sm font-semibold text-gray-900">
+          {activeAttribute.name}
+        </h4>
+        <SingleAttributeChart attribute={activeAttribute} />
+      </div>
+    )}
+  </div>
+);
 };
 
 export default AttributeDistributionChart;

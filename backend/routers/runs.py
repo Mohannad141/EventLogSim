@@ -29,14 +29,74 @@ def save_db(data):
 # Load the database into memory when the server starts
 fake_database = load_db()
 
+def cleanup_old_runs():
+    cutoff = datetime.now() - timedelta(days=30)  # test with 1 day first
+    runs_to_delete = []
+
+    for run_id, run in fake_database.items():
+        created_at = run.get("createdAt")
+
+        if not created_at:
+            continue
+
+        try:
+            created_time = datetime.fromisoformat(created_at)
+
+            if created_time < cutoff:
+                runs_to_delete.append(run_id)
+
+        except ValueError:
+            continue
+
+    for run_id in runs_to_delete:
+        del fake_database[run_id]
+
+    if runs_to_delete:
+        save_db(fake_database)
+
+
+cleanup_old_runs()
+def build_attribute_distribution(events, config):
+    attribute_names = ["role"]
+
+    for attr in config.get("attributes", []):
+        name = attr.get("name")
+        if name and name not in attribute_names:
+            attribute_names.append(name)
+
+    distributions = []
+
+    for attr_name in attribute_names:
+        counts = {}
+
+        for event in events:
+            value = event.get(attr_name)
+
+            if value is None:
+                value = event.get("attributes", {}).get(attr_name)
+
+            if value is None or value == "":
+                continue
+
+            counts[str(value)] = counts.get(str(value), 0) + 1
+
+        distributions.append({
+            "name": attr_name,
+            "values": [
+                {"value": value, "count": count}
+                for value, count in counts.items()
+            ]
+        })
+
+    return distributions
+
 def generate_simulation_data(config):
     """
     Implements the Event Log Generation logic from Lecture 04 (Slide 27).
     Uses the provided agents, attributes, and case count to create a realistic log.
     """
     case_count = config["simulation"].get("caseCount", 10)
-    seed = config["simulation"].get("seed")
-    rng = random.Random(seed)
+    rng = random.Random()
     
     agents = config.get("agents", [])
     attributes = config.get("attributes", [])
@@ -108,13 +168,13 @@ def generate_simulation_data(config):
         "count": v[1],
         "percentage": round((v[1] / case_count) * 100, 1)
     } for v in sorted_variants[:5]]
-
+  
     stats = {
         "caseCount": case_count,
         "eventCount": len(events),
         "variantCount": len(variants),
         "eventDistribution": [{"activity": k, "count": v} for k, v in event_distribution.items()],
-        "attributeDistribution": [], 
+        "attributeDistribution": build_attribute_distribution(events, config),
         "topVariants": top_variants
     }
     
@@ -154,6 +214,18 @@ async def create_run(
 def list_runs():
     return {"runs": list(fake_database.values())}
 
+@router.delete("/runs")
+def delete_runs(run_ids: list[str]):
+    deleted = 0
+
+    for run_id in run_ids:
+        if run_id in fake_database:
+            del fake_database[run_id]
+            deleted += 1
+
+    save_db(fake_database)
+
+    return {"deleted": deleted}
 
 @router.get("/runs/{run_id}")
 def get_run_detail(run_id: str):
@@ -163,7 +235,10 @@ def get_run_detail(run_id: str):
     run = fake_database[run_id]
 
     if "stats" not in run:
-        stats, events = generate_simulation_data(run["config"])
+        result = generate_simulation_data(run["config"])
+        print("RESULT:", result)
+
+        stats, events = result
         run["stats"] = stats
         run["events"] = events
         save_db(fake_database)
