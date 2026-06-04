@@ -11,7 +11,7 @@ import AgentsStep from '../components/configuration/AgentsStep.jsx';
 import AttributesStep from '../components/configuration/AttributesStep.jsx';
 import SimulationStep from '../components/configuration/SimulationStep.jsx';
 import { useConfigState } from '../hooks/useConfigState.js';
-import { useRuns } from '../hooks/useRuns.js';
+import { useRuns } from '../hooks/useRuns.jsx';
 import { validateAll } from '../lib/validation.js';
 import { createRun } from '../lib/api.js';
 

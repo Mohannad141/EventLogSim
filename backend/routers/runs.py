@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Form, UploadFile, File, HTTPException
 from schema.config import SimulationRunConfig
+from simulation_engine.event_log_generation import generate_event_log
 
 # 1. Create the router object
 router = APIRouter()
@@ -92,9 +93,59 @@ def build_attribute_distribution(events, config):
 
 def generate_simulation_data(config):
     """
-    Implements the Event Log Generation logic from Lecture 04 (Slide 27).
-    Uses the provided agents, attributes, and case count to create a realistic log.
+    Implements the Event Log Generation logic.
+    Supports both RANDOM (baseline) and LLM-BASED simulation.
     """
+    process_mode = config["process"].get("mode", "RANDOM")
+    
+    if process_mode in ["PURE_LLM", "LLM_BASED"]:
+        # Use the LLM Engine
+        try:
+            # We need to pass a SimulationRunConfig object
+            config_obj = SimulationRunConfig(**config)
+            events = generate_event_log(config_obj)
+        except Exception as e:
+            print(f"LLM Simulation failed: {e}")
+            # Fallback to random if LLM fails
+            return generate_random_simulation_data(config)
+    else:
+        return generate_random_simulation_data(config)
+
+    # Calculate distributions and stats for LLM events
+    variants = {}
+    event_distribution = {}
+    
+    # Process the events list which is already flat from generate_event_log
+    case_activities = {}
+    for ev in events:
+        c_id = ev["caseId"]
+        act = ev["activity"]
+        case_activities.setdefault(c_id, []).append(act)
+        event_distribution[act] = event_distribution.get(act, 0) + 1
+
+    for c_id, activities in case_activities.items():
+        trace = tuple(activities)
+        variants[trace] = variants.get(trace, 0) + 1
+
+    sorted_variants = sorted(variants.items(), key=lambda x: x[1], reverse=True)
+    top_variants = [{
+        "activities": list(v[0]),
+        "count": v[1],
+        "percentage": round((v[1] / len(case_activities)) * 100, 1) if case_activities else 0
+    } for v in sorted_variants[:5]]
+
+    stats = {
+        "caseCount": len(case_activities),
+        "eventCount": len(events),
+        "variantCount": len(variants),
+        "eventDistribution": [{"activity": k, "count": v} for k, v in event_distribution.items()],
+        "attributeDistribution": build_attribute_distribution(events, config),
+        "topVariants": top_variants
+    }
+    
+    return stats, events
+
+def generate_random_simulation_data(config):
     case_count = config["simulation"].get("caseCount", 10)
     rng = random.Random()
     
@@ -111,26 +162,20 @@ def generate_simulation_data(config):
     for i in range(case_count):
         case_id = f"CASE-{i+1:04d}"
         
-        # Determine a random sequence length for this case
         num_events = rng.randint(3, 7)
-        # Sequence: Start -> Middle -> End
         case_activities = ["Registration"] + [rng.choice(base_activities[1:-1]) for _ in range(num_events - 2)] + ["Notification"]
         
-        # Track the trace variant
         trace = tuple(case_activities)
         variants[trace] = variants.get(trace, 0) + 1
 
-        # Start time for this case
         timestamp = datetime.now() - timedelta(days=rng.randint(0, 3), hours=rng.randint(0, 23))
 
         for activity in case_activities:
-            # Pick a RANDOM agent from the user's list (Lecture pattern)
             if agents:
                 agent = rng.choice(agents)
             else:
                 agent = {"name": "System", "role": "Automated"}
             
-            # Populate custom attributes with randomized data
             attr_values = {}
             for attr in custom_attrs:
                 name = attr["name"]
@@ -153,7 +198,6 @@ def generate_simulation_data(config):
                 "attributes": attr_values
             })
             
-            # Advance time for the next step
             timestamp += timedelta(hours=rng.randint(1, 4))
 
     # Calculate distributions
