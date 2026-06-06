@@ -26,3 +26,9 @@ pnpm-debug.log*
 # Documentation
 GEMINI.md
 CLAUDE.md
+
+# Python
+__pycache__/
+*.pyc
+backend/venv/
+.env
