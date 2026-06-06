@@ -7,7 +7,7 @@ import RunListHeader from '../components/runs/RunListHeader.jsx';
 import RunCard from '../components/runs/RunCard.jsx';
 import SelectionToolbar from '../components/runs/SelectionToolbar.jsx';
 import ComparePanel from '../components/runs/ComparePanel.jsx';
-import { useRuns } from '../hooks/useRuns.js';
+import { useRuns } from '../hooks/useRuns.jsx';
 import ConfirmDialog from '../components/common/ConfirmDialog.jsx';
 
 const MAX_SELECTION = 4;

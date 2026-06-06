@@ -23,12 +23,13 @@ const SimulationStep = ({
   const { errors } = validateSimulation(simulation);
 
   const handleCaseCountChange = (raw) => {
-    const n = Number(raw);
-    if (!Number.isFinite(n)) {
-      onChangeCaseCount(0);
+    if (raw === '') {
+      onChangeCaseCount('');
       return;
     }
-    onChangeCaseCount(clamp(Math.round(n), MIN_CASES, MAX_CASES));
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return;
+    onChangeCaseCount(n);
   };
 
   return (

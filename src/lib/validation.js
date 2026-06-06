@@ -48,6 +48,7 @@ export const validateAttributes = () => ok();
 
 export const validateSimulation = (simulation = {}) => {
   const errors = {};
+  const caseCount = simulation.caseCount;
 
   if (
     typeof caseCount !== 'number' ||

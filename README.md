@@ -44,19 +44,33 @@ Modern process mining requires diverse and high-fidelity event logs for testing 
 2. Install dependencies:
    ```bash
    npm install
+   cd backend && pip install -e .
    ```
 
-3. Create a `.env` file from the example (if applicable):
+3. Configure environment variables:
+   Create a `.env` file in the root directory:
    ```bash
    cp .env.example .env
    ```
+   Edit `.env` and add your API keys. EventLogSim supports multiple providers:
+   - **DeepSeek**: Set `DS_API_KEY`
+   - **OpenAI**: Set `OPENAI_API_KEY`
+   - **Google Gemini**: Set `GOOGLE_API_KEY`
+
+   The system will automatically detect and use the available key (prioritizing DeepSeek, then OpenAI, then Gemini).
 
 ### Development
 
-Start the development server with Hot Module Replacement (HMR):
-```bash
-npm run dev
-```
+1. Start the backend:
+   ```bash
+   cd backend
+   uvicorn main:app --reload
+   ```
+
+2. Start the frontend:
+   ```bash
+   npm run dev
+   ```
 
 ### Build
 

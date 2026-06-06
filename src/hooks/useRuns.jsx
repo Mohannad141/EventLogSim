@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useContext } from 'react';
 import { RunsContext } from './RunsContext.js';
 import { listRuns } from '../lib/api.js';
 
@@ -8,6 +8,14 @@ const sortByCreatedDesc = (runs) =>
     const tb = new Date(b.createdAt || 0).getTime();
     return tb - ta;
   });
+
+export const useRuns = () => {
+  const ctx = useContext(RunsContext);
+  if (!ctx) {
+    throw new Error('useRuns must be used inside a RunsProvider');
+  }
+  return ctx;
+};
 
 export const RunsProvider = ({ children }) => {
   const [runs, setRuns] = useState([]);
