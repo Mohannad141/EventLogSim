@@ -278,13 +278,16 @@ def get_run_detail(run_id: str):
     
     run = fake_database[run_id]
 
-    if "stats" not in run:
+    # Only generate if events don't exist yet
+    if not run.get("events") or not run.get("stats"):
+        print(f"Generating simulation data for run {run_id}...")
         result = generate_simulation_data(run["config"])
-        print("RESULT:", result)
-
+        
         stats, events = result
         run["stats"] = stats
         run["events"] = events
+        # Update the global fake_database and save immediately
+        fake_database[run_id] = run
         save_db(fake_database)
 
     return run

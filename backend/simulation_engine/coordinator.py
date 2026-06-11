@@ -13,17 +13,23 @@ MAX_DEBUG_PRINTS = 3
 ASSIGNMENT_PROMPT = """\
 You are the coordinator of a process simulation.
 
+Process Goal/Summary: {process_summary}
+
 Your task is to assign one unfinished process instance to one suitable agent.
 
-Unfinished process instances:
+Unfinished process instances (with history and current data):
 {process_states}
 
-Available agents:
+Available agents (with roles and capabilities):
 {agents}
 
-Choose exactly one process_id and one agent_id from the provided lists.
-Prefer an agent whose role and actions fit the current process state.
-Write a short message to the selected agent.
+INSTRUCTIONS:
+1. Choose exactly one process_id and one agent_id.
+2. Review the "History" in the process state. Do NOT repeat the same action if it was already successful.
+3. Choose an agent whose role makes sense for the NEXT step in the process goal.
+4. If a hand-off is needed (e.g., from an 'Initial Phase' role to a 'Specialist' role), pick the new role now.
+
+Write a short message to the selected agent explaining what they should do next.
 
 {format_instructions}
 """
@@ -42,6 +48,7 @@ class Coordinator(BaseModel):
         llm: Any,
         process_states: List[Dict[str, Any]],
         agents: List[Dict[str, Any]],
+        process_summary: str = "A business process."
     ) -> AgentProcessAssignment:
         
         if not process_states:
@@ -55,11 +62,12 @@ class Coordinator(BaseModel):
 
         prompt_template = PromptTemplate(
             template=ASSIGNMENT_PROMPT,
-            input_variables=["process_states", "agents"],
+            input_variables=["process_states", "agents", "process_summary"],
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
         
         prompt = prompt_template.format(
+            process_summary=process_summary,
             process_states=json.dumps(process_states, indent=2),
             agents=json.dumps(agents, indent=2),
         )

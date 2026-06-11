@@ -79,11 +79,12 @@ def get_business_events(events: List[Any]) -> List[Any]:
 def get_current_process(process_id: str, events: List[Any]) -> Dict[str, Any]:
     process_events = get_events_for_process(process_id, events)
     business_events = get_business_events(process_events)
+    case_data = collect_case_data(process_events)
 
     return {
         "process_id": process_id,
-        "process_state": describe_process_state(business_events),
-        "case_data": collect_case_data(process_events),
+        "process_state": describe_process_state(business_events, case_data),
+        "case_data": case_data,
         "previous_events": process_events,
     }
 
@@ -91,50 +92,61 @@ def get_current_process(process_id: str, events: List[Any]) -> Dict[str, Any]:
 def get_unfinished_process_states(
     process_ids: List[str],
     events: List[Any],
-    terminal_actions: List[str],
 ) -> List[Dict[str, Any]]:
     return [
         {
             "process_id": process_id,
-            "process_state": describe_process_state(get_business_events(get_events_for_process(process_id, events))),
+            "process_state": describe_process_state(
+                get_business_events(get_events_for_process(process_id, events)),
+                collect_case_data(get_events_for_process(process_id, events))
+            ),
             "case_data": collect_case_data(get_events_for_process(process_id, events)),
             "number_of_events": len(get_business_events(get_events_for_process(process_id, events))),
         }
         for process_id in process_ids
-        if not is_process_finished(process_id, events, terminal_actions)
+        if not is_process_finished(process_id, events)
     ]
 
 
 def is_process_finished(
     process_id: str,
     events: List[Any],
-    terminal_actions: List[str],
+    max_events: int = 20,
 ) -> bool:
     process_events = get_business_events(get_events_for_process(process_id, events))
 
     if not process_events:
         return False
 
+    if len(process_events) >= max_events:
+        return True
+
     last_event = process_events[-1]
-    return get_event_value(last_event, "action") in terminal_actions
+    return get_event_value(last_event, "is_terminal") is True
 
 
-def describe_process_state(events: List[Any]) -> str:
+def describe_process_state(events: List[Any], case_data: Dict[str, str]) -> str:
     if not events:
-        return "No event has happened yet."
+        return "Process has just started. No actions taken yet."
 
-    last_event = events[-1]
-    return f"Last action: {get_event_value(last_event, 'action')}"
+    history = " -> ".join([get_event_value(e, "action") for e in events])
+    
+    data_summary = ""
+    if case_data:
+        data_summary = "\nCurrently collected data: " + ", ".join([f"{k}={v}" for k, v in case_data.items()])
+
+    return f"History: {history}.{data_summary}"
 
 
 def collect_case_data(events: List[Any]) -> Dict[str, str]:
     case_data: Dict[str, str] = {}
 
     for event in events:
-        for item in get_event_value(event, "case_data", []) or []:
-            if isinstance(item, dict):
-                case_data[item["attribute"]] = item["value"]
-            else:
-                case_data[item.attribute] = item.value
+        for field_name in ["case_data", "event_data"]:
+            for item in get_event_value(event, field_name, []) or []:
+                if isinstance(item, dict):
+                    case_data[item["attribute"]] = item["value"]
+                else:
+                    case_data[item.attribute] = item.value
 
     return case_data
