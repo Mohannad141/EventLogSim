@@ -23,17 +23,12 @@ pnpm-debug.log*
 *.sln
 *.sw?
 
-#ENV
-.env
-.env.local
-.env.*.local
-
 # Documentation
 GEMINI.md
 CLAUDE.md
 
-# Python
+
 __pycache__/
 *.pyc
-backend/venv/
+venv/
 .env
