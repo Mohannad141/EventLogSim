@@ -21,8 +21,14 @@ Unfinished process instances:
 Available agents:
 {agents}
 
+Each process instance may include an "allowed_next_actions" field listing the actions
+that are permitted as the next step. If "allowed_next_actions" is present and non-empty
+for the instance you choose, the next action MUST be one of those, and you MUST pick an
+agent whose own "actions" list includes at least one of those allowed actions.
+If "allowed_next_actions" is missing or empty, use your own judgement and prefer an
+agent whose role and actions fit the current process state.
+
 Choose exactly one process_id and one agent_id from the provided lists.
-Prefer an agent whose role and actions fit the current process state.
 Write a short message to the selected agent.
 
 {format_instructions}

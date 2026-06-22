@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta
@@ -11,6 +12,7 @@ if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from simulation_engine.actor import Agent, GeneratedEvent
+from simulation_engine.bpmn_parser import parse_bpmn
 from simulation_engine.coordinator import Coordinator
 from simulation_engine.process import (
     get_current_process,
@@ -59,9 +61,34 @@ def generate_event_log(
     ]
 
     coordinator = Coordinator()
-    
+
     # Extract terminal actions or use defaults
     terminal_actions = ["Finish", "End", "Archive", "Complete", "Close Case"]
+    transitions: Optional[Dict[str, Any]] = None
+
+    # BPMN mode: parse the uploaded .bpmn content and use its transitions
+    # and terminal actions to constrain the simulation.
+    bpmn_file = getattr(config.process, "bpmnFile", None)
+    if (
+        getattr(config.process, "mode", None) == "BPMN_BASED"
+        and isinstance(bpmn_file, dict)
+        and bpmn_file.get("content")
+    ):
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                suffix=".bpmn", delete=False, mode="w", encoding="utf-8"
+            ) as tmp:
+                tmp.write(bpmn_file["content"])
+                tmp_path = tmp.name
+            bpmn_data = parse_bpmn(tmp_path)
+            transitions = bpmn_data.get("transitions") or None
+            bpmn_terminals = bpmn_data.get("terminal_actions") or []
+            if bpmn_terminals:
+                terminal_actions = bpmn_terminals
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
 
     process_ids = [case["process_id"] for case in events_by_case]
     
@@ -82,6 +109,7 @@ def generate_event_log(
             process_ids=process_ids,
             events=events_by_case,
             terminal_actions=terminal_actions,
+            transitions=transitions,
         )
 
         if not unfinished_process_states:

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  id="Definitions_Payment"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_Payment" name="Request for Payment" isExecutable="false">
+
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_Employee" name="Employee">
+        <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RequestPayment</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Admin" name="Admin">
+        <bpmn:flowNodeRef>Task_CheckRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_HandlePayment</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Supervisor" name="Supervisor">
+        <bpmn:flowNodeRef>Gateway_Decision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ApproveRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RejectRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Approved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Rejected</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+
+    <bpmn:startEvent id="StartEvent_1" name="Start">
+      <bpmn:outgoing>Flow_Start_Request</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:task id="Task_RequestPayment" name="Request Payment">
+      <bpmn:incoming>Flow_Start_Request</bpmn:incoming>
+      <bpmn:outgoing>Flow_Request_Check</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_CheckRequest" name="Check Request">
+      <bpmn:incoming>Flow_Request_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_Check_Gateway</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:exclusiveGateway id="Gateway_Decision" name="Approved?">
+      <bpmn:incoming>Flow_Check_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Gateway_Approve</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Gateway_Reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:task id="Task_ApproveRequest" name="Approve Request">
+      <bpmn:incoming>Flow_Gateway_Approve</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approve_Handle</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_RejectRequest" name="Reject Request">
+      <bpmn:incoming>Flow_Gateway_Reject</bpmn:incoming>
+      <bpmn:outgoing>Flow_Reject_End</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_HandlePayment" name="Handle Payment">
+      <bpmn:incoming>Flow_Approve_Handle</bpmn:incoming>
+      <bpmn:outgoing>Flow_Handle_End</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:endEvent id="EndEvent_Approved" name="Payment Done">
+      <bpmn:incoming>Flow_Handle_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:endEvent id="EndEvent_Rejected" name="Request Rejected">
+      <bpmn:incoming>Flow_Reject_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Start_Request"   sourceRef="StartEvent_1"        targetRef="Task_RequestPayment" />
+    <bpmn:sequenceFlow id="Flow_Request_Check"   sourceRef="Task_RequestPayment" targetRef="Task_CheckRequest" />
+    <bpmn:sequenceFlow id="Flow_Check_Gateway"   sourceRef="Task_CheckRequest"   targetRef="Gateway_Decision" />
+    <bpmn:sequenceFlow id="Flow_Gateway_Approve" name="yes" sourceRef="Gateway_Decision" targetRef="Task_ApproveRequest" />
+    <bpmn:sequenceFlow id="Flow_Gateway_Reject"  name="no"  sourceRef="Gateway_Decision" targetRef="Task_RejectRequest" />
+    <bpmn:sequenceFlow id="Flow_Approve_Handle"  sourceRef="Task_ApproveRequest" targetRef="Task_HandlePayment" />
+    <bpmn:sequenceFlow id="Flow_Handle_End"      sourceRef="Task_HandlePayment"  targetRef="EndEvent_Approved" />
+    <bpmn:sequenceFlow id="Flow_Reject_End"      sourceRef="Task_RejectRequest"  targetRef="EndEvent_Rejected" />
+
+  </bpmn:process>
+</bpmn:definitions>

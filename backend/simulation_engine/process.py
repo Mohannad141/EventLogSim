@@ -1,4 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+from simulation_engine.bpmn_parser import get_allowed_next_actions
 
 
 def get_process_context(config_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -76,6 +78,13 @@ def get_business_events(events: List[Any]) -> List[Any]:
     ]
 
 
+def get_last_action(events: List[Any]) -> Optional[str]:
+    business_events = get_business_events(events)
+    if not business_events:
+        return None
+    return get_event_value(business_events[-1], "action")
+
+
 def get_current_process(process_id: str, events: List[Any]) -> Dict[str, Any]:
     process_events = get_events_for_process(process_id, events)
     business_events = get_business_events(process_events)
@@ -92,17 +101,27 @@ def get_unfinished_process_states(
     process_ids: List[str],
     events: List[Any],
     terminal_actions: List[str],
+    transitions: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
-    return [
-        {
+    result: List[Dict[str, Any]] = []
+    for process_id in process_ids:
+        if is_process_finished(process_id, events, terminal_actions):
+            continue
+        process_events = get_events_for_process(process_id, events)
+        business_events = get_business_events(process_events)
+        allowed_next_actions = (
+            get_allowed_next_actions(transitions, get_last_action(process_events))
+            if transitions
+            else []
+        )
+        result.append({
             "process_id": process_id,
-            "process_state": describe_process_state(get_business_events(get_events_for_process(process_id, events))),
-            "case_data": collect_case_data(get_events_for_process(process_id, events)),
-            "number_of_events": len(get_business_events(get_events_for_process(process_id, events))),
-        }
-        for process_id in process_ids
-        if not is_process_finished(process_id, events, terminal_actions)
-    ]
+            "process_state": describe_process_state(business_events),
+            "case_data": collect_case_data(process_events),
+            "number_of_events": len(business_events),
+            "allowed_next_actions": allowed_next_actions,
+        })
+    return result
 
 
 def is_process_finished(

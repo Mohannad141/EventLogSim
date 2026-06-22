@@ -9,16 +9,16 @@ import { validateProcess } from '../../lib/validation.js';
 
 const MODES = [
   {
+    value: 'PURE_LLM',
+    title: 'Text-based',
+    description:
+      'Describe the process in plain text; agents coordinate freely via the LLM.',
+  },
+  {
     value: 'BPMN_BASED',
     title: 'BPMN-based',
     description:
-      'Use a BPMN file as the ground truth process model. Agents follow the structure.',
-  },
-  {
-    value: 'PURE_LLM',
-    title: 'Pure LLM',
-    description:
-      'No process model. Agents coordinate freely based on the description.',
+      'Upload a .bpmn file to constrain the simulation by its transitions.',
   },
 ];
 
@@ -126,25 +126,27 @@ const ProcessStep = ({
         </div>
       </fieldset>
 
-      <div>
-        <label
-          htmlFor="process-description"
-          className="block text-sm font-medium text-gray-900"
-        >
-          Process description
-        </label>
-        <Textarea
-          id="process-description"
-          rows={6}
-          value={process.description}
-          onChange={(e) => onChangeDescription(e.target.value)}
-          placeholder="Describe the process in plain English. What is the goal? Who participates? What activities happen and in what order?"
-          className="mt-2"
-        />
-        {errors.description && (
-          <p className="mt-1 text-xs text-red-600">{errors.description}</p>
-        )}
-      </div>
+      {process.mode === 'PURE_LLM' && (
+        <div>
+          <label
+            htmlFor="process-description"
+            className="block text-sm font-medium text-gray-900"
+          >
+            Process description
+          </label>
+          <Textarea
+            id="process-description"
+            rows={6}
+            value={process.description}
+            onChange={(e) => onChangeDescription(e.target.value)}
+            placeholder="Describe the process in plain English. What is the goal? Who participates? What activities happen and in what order?"
+            className="mt-2"
+          />
+          {errors.description && (
+            <p className="mt-1 text-xs text-red-600">{errors.description}</p>
+          )}
+        </div>
+      )}
 
       {process.mode === 'BPMN_BASED' && (
         <div>
