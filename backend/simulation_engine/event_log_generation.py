@@ -42,6 +42,13 @@ def append_event_to_process(event_log: List[dict], process_id: str, event: dict)
         "events": [event],
     })
 
+# Hard safety cap: regardless of caseCount, never make more than this many
+# coordinator iterations in a single run. Each iteration is ~2 LLM calls,
+# so 50 iterations ≈ 100 LLM calls — a sane upper bound for accidental
+# 5000-case inputs that would otherwise burn through API credit.
+MAX_TOTAL_ITERATIONS_HARD_CAP = 50
+
+
 def generate_event_log(
     config: Any, # SimulationRunConfig
     max_events_per_case: int = 5,
@@ -101,15 +108,22 @@ def generate_event_log(
         }
     }
 
-    max_total_events = len(process_ids) * max_events_per_case
+    max_total_events = min(
+        len(process_ids) * max_events_per_case,
+        MAX_TOTAL_ITERATIONS_HARD_CAP,
+    )
 
     for step_index in range(max_total_events):
-        # Get unfinished cases
+        # Get unfinished cases (cases that already reached max_events_per_case
+        # events are auto-finished here to prevent the coordinator from
+        # looping on the same case forever — the structural fix for the
+        # "agents talking in circles" scenario).
         unfinished_process_states = get_unfinished_process_states(
             process_ids=process_ids,
             events=events_by_case,
             terminal_actions=terminal_actions,
             transitions=transitions,
+            max_events_per_case=max_events_per_case,
         )
 
         if not unfinished_process_states:
@@ -123,7 +137,14 @@ def generate_event_log(
                 agents=[agent.model_dump() for agent in agents],
             )
         except Exception as e:
-            print(f"Coordinator error: {e}")
+            # If we never produced an event, the run is a total failure —
+            # re-raise so the caller marks status="failed" with a useful
+            # message instead of silently returning an empty list.
+            has_any_events = any(case["events"] for case in events_by_case)
+            if not has_any_events:
+                raise RuntimeError(f"Coordinator failed on first step: {e}") from e
+            # Partial data already collected — keep it and stop the loop.
+            print(f"Coordinator error (stopping early with partial data): {e}")
             break
 
         # Prepare context for the actor

@@ -102,10 +102,11 @@ def get_unfinished_process_states(
     events: List[Any],
     terminal_actions: List[str],
     transitions: Optional[Dict[str, Any]] = None,
+    max_events_per_case: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     result: List[Dict[str, Any]] = []
     for process_id in process_ids:
-        if is_process_finished(process_id, events, terminal_actions):
+        if is_process_finished(process_id, events, terminal_actions, max_events_per_case):
             continue
         process_events = get_events_for_process(process_id, events)
         business_events = get_business_events(process_events)
@@ -128,11 +129,19 @@ def is_process_finished(
     process_id: str,
     events: List[Any],
     terminal_actions: List[str],
+    max_events_per_case: Optional[int] = None,
 ) -> bool:
     process_events = get_business_events(get_events_for_process(process_id, events))
 
     if not process_events:
         return False
+
+    # Safety net: even if the LLM never reaches a terminal action (common when
+    # agent.actions doesn't overlap with terminal_actions), force the case to
+    # finish after max_events_per_case events. Without this the coordinator
+    # can loop forever on the same case, burning tokens.
+    if max_events_per_case is not None and len(process_events) >= max_events_per_case:
+        return True
 
     last_event = process_events[-1]
     return get_event_value(last_event, "action") in terminal_actions

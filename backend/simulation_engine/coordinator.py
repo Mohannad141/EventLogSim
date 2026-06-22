@@ -28,6 +28,15 @@ agent whose own "actions" list includes at least one of those allowed actions.
 If "allowed_next_actions" is missing or empty, use your own judgement and prefer an
 agent whose role and actions fit the current process state.
 
+Spread work across cases: among the unfinished instances, prefer the one with the
+LOWEST "number_of_events" so every case advances roughly in parallel. Avoid
+repeatedly returning to a case that is already further along while other cases
+have zero events.
+
+Also vary the chosen agent and action when possible — do not keep assigning the
+same agent to the same case over and over with the same action; that produces an
+unrealistic event log.
+
 Choose exactly one process_id and one agent_id from the provided lists.
 Write a short message to the selected agent.
 

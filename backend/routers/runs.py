@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import time
 import uuid
 from collections import Counter, defaultdict
@@ -15,6 +16,19 @@ router = APIRouter()
 DB_FILE = "database.json"
 
 ESSENTIAL_ATTRIBUTE_NAMES = {"caseId", "activity", "timestamp"}
+
+# Per-run lock to prevent concurrent LLM generation for the same run id
+# (React strict mode and double-clicks would otherwise trigger generation
+# twice and double the cost).
+_generation_locks: Dict[str, threading.Lock] = {}
+_locks_guard = threading.Lock()
+
+
+def _get_run_lock(run_id: str) -> threading.Lock:
+    with _locks_guard:
+        if run_id not in _generation_locks:
+            _generation_locks[run_id] = threading.Lock()
+        return _generation_locks[run_id]
 
 
 def load_db():
@@ -186,7 +200,19 @@ def get_run_detail(run_id: str):
 
     run = fake_database[run_id]
 
-    if "stats" not in run or "events" not in run:
+    if "stats" in run and "events" in run:
+        return with_snapshot_alias(run)
+
+    # Serialize concurrent generations for the same run id. Without this,
+    # React strict mode (or any double-tab/double-click) triggers two parallel
+    # LLM jobs and doubles the token cost.
+    lock = _get_run_lock(run_id)
+    with lock:
+        # Re-check: another concurrent request may have just finished generating.
+        run = fake_database[run_id]
+        if "stats" in run and "events" in run:
+            return with_snapshot_alias(run)
+
         config_snapshot = run.get("config") or {}
 
         # Try to rebuild the Pydantic config first; bail early on bad stored data.

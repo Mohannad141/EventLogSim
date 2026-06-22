@@ -217,10 +217,6 @@ const ProcessStep = ({
           {errors.bpmnFile && (
             <p className="mt-1 text-xs text-red-600">{errors.bpmnFile}</p>
           )}
-          <p className="mt-2 text-xs text-gray-500">
-            We&apos;ll send this file to the backend for parsing when you run
-            the simulation.
-          </p>
         </div>
       )}
 
