@@ -14,7 +14,7 @@ You are an agent participating in a business process.
 
 Process Summary: {process_summary}
 Your Role: {role}
-Your Profile: {profile}
+Your Profile/Description: {profile}
 Available Actions: {actions}
 
 Each action may require specific data. Below is a mapping of actions to their required data fields:
@@ -26,13 +26,17 @@ You MUST always provide values for all event data attributes with each action yo
 
 You are assigned to the following current process instance with the message from the coordinator:
 Process ID: {process_id}
-Current Process State: {process_state}
+Current Process State (History & Data): {process_state}
 Coordinator Message: {coordinator_message}
 
 You MUST use exactly this process ID in your output: {process_id}
 
 Please analyze the current process state and coordinator message, and determine the most appropriate action to take.
-If the action you choose is the final step that successfully completes, closes, resolves, or ends the entire process instance, set is_terminal to true. Otherwise, set it to false.
+
+DYNAMIC TERMINATION:
+Set "is_terminal" to true ONLY if the action you are taking is the ABSOLUTE FINAL step for the entire process instance (e.g., the goal is achieved, the case is closed, and no more actions by ANY agent are needed).
+If the process needs to be handed over to another role or another step is required, you MUST set "is_terminal" to false.
+Example of terminal logic: An "Initial Check" is NEVER terminal. A "Final Delivery" or "Case Closure" is usually terminal.
 
 {format_instructions}
 """
@@ -48,7 +52,7 @@ class GeneratedEvent(BaseModel):
     action: str = Field(..., description="The action chosen by the agent")
     start_timestamp: str = Field(..., description="The timestamp when the action started")
     end_timestamp: str = Field(..., description="The timestamp when the action ended")
-    is_terminal: bool = Field(default=False, description="Set to true if this action completes the entire case/process instance")
+    is_terminal: bool = Field(default=False, description="Set to true if this action completes the entire process instance.")
     case_data: Optional[List[EventAttribute]] = Field(default=None, description="A list of case data attributes relevant to the specific action")
     event_data: Optional[List[EventAttribute]] = Field(default=None, description="A list of event data attributes relevant to all actions")
 
@@ -57,7 +61,8 @@ class GeneratedEvent(BaseModel):
 class Agent(BaseModel):
     id: str
     role: str
-    profile: Optional[Dict[str, str]] = Field(default=None)
+    description: str = ""
+    age: Optional[int] = None
     actions: List[str]
 
     @classmethod
@@ -65,18 +70,19 @@ class Agent(BaseModel):
         return cls(
             id=data["id"],
             role=data["role"],
-            profile=data.get("profile"),
+            description=data.get("description", ""),
+            age=data.get("age"),
             actions=data["actions"],
         )
 
     def profile_text(self) -> str:
-        if not self.profile:
-            return "No additional profile data."
-
-        return ", ".join(
-            f"{name}: {value}"
-            for name, value in self.profile.items()
-        )
+        parts = []
+        if self.description:
+            parts.append(self.description)
+        if self.age:
+            parts.append(f"Age: {self.age}")
+        
+        return " ".join(parts) if parts else "No additional profile data."
 
     def generate_single_event(
         self,

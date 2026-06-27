@@ -88,11 +88,12 @@ def get_last_action(events: List[Any]) -> Optional[str]:
 def get_current_process(process_id: str, events: List[Any]) -> Dict[str, Any]:
     process_events = get_events_for_process(process_id, events)
     business_events = get_business_events(process_events)
+    case_data = collect_case_data(process_events)
 
     return {
         "process_id": process_id,
-        "process_state": describe_process_state(business_events),
-        "case_data": collect_case_data(process_events),
+        "process_state": describe_process_state(business_events, case_data),
+        "case_data": case_data,
         "previous_events": process_events,
     }
 
@@ -110,6 +111,7 @@ def get_unfinished_process_states(
             continue
         process_events = get_events_for_process(process_id, events)
         business_events = get_business_events(process_events)
+        case_data = collect_case_data(process_events)
         allowed_next_actions = (
             get_allowed_next_actions(transitions, get_last_action(process_events))
             if transitions
@@ -117,11 +119,12 @@ def get_unfinished_process_states(
         )
         result.append({
             "process_id": process_id,
-            "process_state": describe_process_state(business_events),
-            "case_data": collect_case_data(process_events),
+            "process_state": describe_process_state(business_events, case_data),
+            "case_data": case_data,
             "number_of_events": len(business_events),
             "allowed_next_actions": allowed_next_actions,
         })
+
     return result
 
 
@@ -171,22 +174,28 @@ def is_process_finished(
 
 
 
-def describe_process_state(events: List[Any]) -> str:
+def describe_process_state(events: List[Any], case_data: Dict[str, str]) -> str:
     if not events:
-        return "No event has happened yet."
+        return "Process has just started. No actions taken yet."
 
-    last_event = events[-1]
-    return f"Last action: {get_event_value(last_event, 'action')}"
+    history = " -> ".join([get_event_value(e, "action") for e in events])
+    
+    data_summary = ""
+    if case_data:
+        data_summary = "\nCurrently collected data: " + ", ".join([f"{k}={v}" for k, v in case_data.items()])
+
+    return f"History: {history}.{data_summary}"
 
 
 def collect_case_data(events: List[Any]) -> Dict[str, str]:
     case_data: Dict[str, str] = {}
 
     for event in events:
-        for item in get_event_value(event, "case_data", []) or []:
-            if isinstance(item, dict):
-                case_data[item["attribute"]] = item["value"]
-            else:
-                case_data[item.attribute] = item.value
+        for field_name in ["case_data", "event_data"]:
+            for item in get_event_value(event, field_name, []) or []:
+                if isinstance(item, dict):
+                    case_data[item["attribute"]] = item["value"]
+                else:
+                    case_data[item.attribute] = item.value
 
     return case_data

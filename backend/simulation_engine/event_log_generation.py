@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 import tempfile
 from pathlib import Path
@@ -53,6 +54,7 @@ def generate_event_log(
     config: Any, # SimulationRunConfig
     max_events_per_case: int = 5,
 ):
+
     # Prepare agents
     agents = build_agents_from_config(config.agents)
     agents_by_id = {agent.id: agent for agent in agents}
@@ -127,15 +129,31 @@ def generate_event_log(
         )
 
         if not unfinished_process_states:
+            print("--- All cases finished naturally ---")
             break
 
-        # Call coordinator
+        # Shuffle to prevent "batching" behavior and introduce randomness
+        random.shuffle(unfinished_process_states)
+
+        # Limit to max 10 states to prevent prompt bloat and LLM confusion
+        coordinator_states = unfinished_process_states[:10]
+
+        # 2. Call coordinator to assign ONE case to ONE agent with fallback
         try:
             assignment = coordinator.assign_agent_project(
                 llm=llm,
-                process_states=unfinished_process_states,
+                process_states=coordinator_states,
                 agents=[agent.model_dump() for agent in agents],
+                process_summary=config.process.description
             )
+            
+            # Validate coordinator output
+            process_ids_set = {state["process_id"] for state in coordinator_states}
+            agent_ids_set = {agent.id for agent in agents}
+            
+            if assignment.process_id not in process_ids_set or assignment.agent_id not in agent_ids_set:
+                raise ValueError("Coordinator returned invalid process_id or agent_id")
+                
         except Exception as e:
             # If we never produced an event, the run is a total failure —
             # re-raise so the caller marks status="failed" with a useful
@@ -154,7 +172,6 @@ def generate_event_log(
         )
         current_process["coordinator_message"] = assignment.message or "Please proceed with the next step."
 
-        # Call actor
         agent = agents_by_id[assignment.agent_id]
         try:
             generated_event: GeneratedEvent = agent.generate_single_event(
@@ -163,10 +180,20 @@ def generate_event_log(
                 llm=llm,
             )
 
-            # Add to our internal tracking for the loop
+            # Add to our internal tracking
             ev_data = generated_event.model_dump()
             ev_data["agent_id"] = agent.id
-            ev_data["timestamp"] = (datetime.now() + timedelta(minutes=step_index * 15)).isoformat()
+            
+            # Advance timestamp by 15-45 minutes per step for realism
+            prev_events = current_process.get("previous_events", [])
+            if prev_events:
+                last_time = datetime.fromisoformat(prev_events[-1].get("timestamp"))
+                new_time = last_time + timedelta(minutes=random.randint(15, 45))
+            else:
+                # Base starting time for the very first event of a case
+                new_time = datetime.now() + timedelta(minutes=step_index * 5)
+            
+            ev_data["timestamp"] = new_time.isoformat()
             append_event_to_process(events_by_case, assignment.process_id, ev_data)
             
         except Exception as e:
@@ -180,6 +207,15 @@ def generate_event_log(
         for ev in case["events"]:
             agent_obj = agents_by_id.get(ev.get("agent_id"))
             
+            # Combine attributes from both event_data and case_data for safety
+            combined_attributes = {}
+            for field in ["event_data", "case_data"]:
+                for attr in ev.get(field) or []:
+                    if isinstance(attr, dict):
+                        combined_attributes[attr["attribute"]] = attr["value"]
+                    else:
+                        combined_attributes[attr.attribute] = attr.value
+            
             final_events.append({
                 "caseId": p_id,
                 "activity": ev["action"],
@@ -187,7 +223,7 @@ def generate_event_log(
                 "is_terminal": ev.get("is_terminal", False),
                 "resource": agent_obj.id if agent_obj else "Unknown",
                 "role": agent_obj.role if agent_obj else "Unknown",
-                "attributes": {attr["attribute"]: attr["value"] for attr in (ev.get("event_data") or [])}
+                "attributes": combined_attributes
             })
 
     return final_events
