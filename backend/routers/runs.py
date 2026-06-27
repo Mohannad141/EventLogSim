@@ -1,52 +1,35 @@
+import asyncio
 import json
-import os
-import threading
 import time
 import uuid
 from collections import Counter, defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Form, UploadFile, File, HTTPException
+from fastapi import APIRouter, Form, UploadFile, File, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from schema.config import SimulationRunConfig
+from db.session import get_db
+from db import crud
 
 router = APIRouter()
-
-DB_FILE = "database.json"
 
 ESSENTIAL_ATTRIBUTE_NAMES = {"caseId", "activity", "timestamp"}
 
 # Per-run lock to prevent concurrent LLM generation for the same run id
 # (React strict mode and double-clicks would otherwise trigger generation
 # twice and double the cost).
-_generation_locks: Dict[str, threading.Lock] = {}
-_locks_guard = threading.Lock()
+_generation_locks: Dict[str, asyncio.Lock] = {}
+_locks_guard = asyncio.Lock()
 
 
-def _get_run_lock(run_id: str) -> threading.Lock:
-    with _locks_guard:
+async def _get_run_lock(run_id: str) -> asyncio.Lock:
+    async with _locks_guard:
         if run_id not in _generation_locks:
-            _generation_locks[run_id] = threading.Lock()
+            _generation_locks[run_id] = asyncio.Lock()
         return _generation_locks[run_id]
 
-
-def load_db():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            try:
-                return json.load(f)
-            except Exception:
-                return {}
-    return {}
-
-
-def save_db(data):
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
-
-fake_database = load_db()
 
 
 def compute_stats(
@@ -152,6 +135,7 @@ def with_snapshot_alias(run: Dict[str, Any]) -> Dict[str, Any]:
 async def create_run(
     config: str = Form(...),
     bpmn: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db)
 ):
     try:
         config_dict = json.loads(config)
@@ -176,41 +160,31 @@ async def create_run(
     else:
         config_name = "Untitled run"
 
-    record = {
-        "id": run_id,
-        "status": "pending",
-        "createdAt": datetime.now().isoformat(),
-        "config": valid_config.model_dump(),
-        "configName": config_name,
-    }
-    fake_database[run_id] = record
-    save_db(fake_database)
+    record = await crud.create_run(db, run_id, valid_config.model_dump(), config_name)
     return with_snapshot_alias(record)
 
 
 @router.get("/runs")
-def list_runs():
-    return {"runs": [with_snapshot_alias(run) for run in fake_database.values()]}
+async def list_runs(db: AsyncSession = Depends(get_db)):
+    runs = await crud.get_runs(db)
+    return {"runs": [with_snapshot_alias(run) for run in runs]}
 
 
 @router.get("/runs/{run_id}")
-def get_run_detail(run_id: str):
-    if run_id not in fake_database:
+async def get_run_detail(run_id: str, db: AsyncSession = Depends(get_db)):
+    run = await crud.get_run_by_id(db, run_id)
+    if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run = fake_database[run_id]
-
-    if "stats" in run and "events" in run:
+    if run.get("status") in ("completed", "failed") and run.get("stats") is not None:
         return with_snapshot_alias(run)
 
-    # Serialize concurrent generations for the same run id. Without this,
-    # React strict mode (or any double-tab/double-click) triggers two parallel
-    # LLM jobs and doubles the token cost.
-    lock = _get_run_lock(run_id)
-    with lock:
+    # Serialize concurrent generations for the same run id.
+    lock = await _get_run_lock(run_id)
+    async with lock:
         # Re-check: another concurrent request may have just finished generating.
-        run = fake_database[run_id]
-        if "stats" in run and "events" in run:
+        run = await crud.get_run_by_id(db, run_id)
+        if run.get("status") in ("completed", "failed") and run.get("stats") is not None:
             return with_snapshot_alias(run)
 
         config_snapshot = run.get("config") or {}
@@ -219,41 +193,35 @@ def get_run_detail(run_id: str):
         try:
             valid_config = SimulationRunConfig(**config_snapshot)
         except Exception as e:
-            run["status"] = "failed"
-            run["error"] = f"Stored config is invalid: {e}"
-            run["events"] = []
-            run["stats"] = compute_stats([], config_snapshot)
-            run["duration"] = 0
-            save_db(fake_database)
-            return with_snapshot_alias(run)
+            stats = compute_stats([], config_snapshot)
+            await crud.save_failed_run(db, run_id, f"Stored config is invalid: {e}", stats)
+            updated_run = await crud.get_run_by_id(db, run_id)
+            return with_snapshot_alias(updated_run)
 
         # Lazy import: event_log_generation initializes the LLM at module load.
-        # Importing it eagerly would force every process startup to depend on
-        # API keys even when no run is being executed.
         try:
             from simulation_engine.event_log_generation import generate_event_log
         except Exception as e:
-            run["status"] = "failed"
-            run["error"] = f"Simulation engine unavailable: {e}"
-            run["events"] = []
-            run["stats"] = compute_stats([], config_snapshot)
-            run["duration"] = 0
-            save_db(fake_database)
-            return with_snapshot_alias(run)
+            stats = compute_stats([], config_snapshot)
+            await crud.save_failed_run(db, run_id, f"Simulation engine unavailable: {e}", stats)
+            updated_run = await crud.get_run_by_id(db, run_id)
+            return with_snapshot_alias(updated_run)
 
         started = time.time()
         try:
-            events = generate_event_log(valid_config)
-            run["events"] = events
-            run["stats"] = compute_stats(events, config_snapshot)
-            run["status"] = "completed"
-            run.pop("error", None)
+            # generate_event_log is a blocking synchronous LLM generation call.
+            # To prevent blocking the async event loop during long LLM calls,
+            # we run it in a threadpool.
+            from fastapi.concurrency import run_in_threadpool
+            events = await run_in_threadpool(generate_event_log, valid_config)
+            
+            stats = compute_stats(events, config_snapshot)
+            duration = int((time.time() - started) * 1000)
+            await crud.save_completed_run(db, run_id, events, stats, duration)
         except Exception as e:
-            run["status"] = "failed"
-            run["error"] = str(e)
-            run["events"] = []
-            run["stats"] = compute_stats([], config_snapshot)
-        run["duration"] = int((time.time() - started) * 1000)
-        save_db(fake_database)
+            stats = compute_stats([], config_snapshot)
+            await crud.save_failed_run(db, run_id, str(e), stats)
 
-    return with_snapshot_alias(run)
+        updated_run = await crud.get_run_by_id(db, run_id)
+        return with_snapshot_alias(updated_run)
+

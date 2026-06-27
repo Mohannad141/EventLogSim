@@ -32,6 +32,7 @@ Coordinator Message: {coordinator_message}
 You MUST use exactly this process ID in your output: {process_id}
 
 Please analyze the current process state and coordinator message, and determine the most appropriate action to take.
+If the action you choose is the final step that successfully completes, closes, resolves, or ends the entire process instance, set is_terminal to true. Otherwise, set it to false.
 
 {format_instructions}
 """
@@ -47,8 +48,10 @@ class GeneratedEvent(BaseModel):
     action: str = Field(..., description="The action chosen by the agent")
     start_timestamp: str = Field(..., description="The timestamp when the action started")
     end_timestamp: str = Field(..., description="The timestamp when the action ended")
+    is_terminal: bool = Field(default=False, description="Set to true if this action completes the entire case/process instance")
     case_data: Optional[List[EventAttribute]] = Field(default=None, description="A list of case data attributes relevant to the specific action")
     event_data: Optional[List[EventAttribute]] = Field(default=None, description="A list of event data attributes relevant to all actions")
+
 
 
 class Agent(BaseModel):

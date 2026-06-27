@@ -144,7 +144,31 @@ def is_process_finished(
         return True
 
     last_event = process_events[-1]
-    return get_event_value(last_event, "action") in terminal_actions
+    
+    # 1. Check if the LLM agent explicitly marked the last action as terminal
+    if get_event_value(last_event, "is_terminal") is True:
+        return True
+
+    last_action = get_event_value(last_event, "action")
+    if not last_action:
+        return False
+
+    last_action_lower = last_action.lower()
+
+    # 2. Fallback: Check exact case-insensitive matches with specified terminal actions
+    for term in terminal_actions:
+        if last_action_lower == term.lower():
+            return True
+
+    # 3. Fallback: Check for typical halting keywords in the action text (e.g. "Resolve Ticket", "Close Case")
+    halting_keywords = ["finish", "end", "archive", "complete", "close", "resolve", "terminate"]
+    for keyword in halting_keywords:
+        if keyword in last_action_lower:
+            return True
+
+    return False
+
+
 
 
 def describe_process_state(events: List[Any]) -> str:

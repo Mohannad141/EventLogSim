@@ -184,9 +184,11 @@ def generate_event_log(
                 "caseId": p_id,
                 "activity": ev["action"],
                 "timestamp": ev.get("timestamp", datetime.now().isoformat()),
+                "is_terminal": ev.get("is_terminal", False),
                 "resource": agent_obj.id if agent_obj else "Unknown",
                 "role": agent_obj.role if agent_obj else "Unknown",
                 "attributes": {attr["attribute"]: attr["value"] for attr in (ev.get("event_data") or [])}
             })
 
     return final_events
+

@@ -41,6 +41,16 @@ def get_llm():
         openai_api_key=groq_key,
         openai_api_base="https://api.groq.com/openai/v1"
         )
+    
+    # 5. HPC (Used if key is present)
+    hpc_key = os.getenv("HPC_API_KEY")
+    if hpc_key:
+        return ChatOpenAI(
+            model=os.getenv("HPC_MODEL_NAME", "gpt-oss-120b"),
+            openai_api_key=hpc_key,
+            openai_api_base="https://hub.nhr.fau.de/api/llmgw/v1",
+            temperature=0.7
+        )
 
     # Fallback or Error
     raise ValueError("No LLM API key found. Please set DS_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in your .env file.")
