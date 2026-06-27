@@ -23,8 +23,8 @@ Modern process mining requires diverse and high-fidelity event logs for testing 
 - **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
 - **Routing**: [React Router 7](https://reactrouter.com/)
 - **Charts**: [Recharts](https://recharts.org/)
-- **Icons**: [Lucide React](https://lucide.dev/)
-- **State Management**: React Context & Custom Hooks
+- **Backend**: [FastAPI](https://fastapi.tiangolo.com/) (Python)
+- **Database**: [PostgreSQL](https://www.postgresql.org/) (via [SQLAlchemy](https://www.sqlalchemy.org/) & `asyncpg` connection pool)
 
 ##  Getting Started
 
@@ -32,52 +32,62 @@ Modern process mining requires diverse and high-fidelity event logs for testing 
 
 - [Node.js](https://nodejs.org/) (v18 or higher recommended)
 - [npm](https://www.npmjs.com/)
+- [Docker & Docker Compose](https://www.docker.com/) (to run PostgreSQL)
+- [uv](https://github.com/astral-sh/uv) (recommended Python package manager)
 
-### Installation
+### Installation & Setup
 
-1. Clone the repository:
+1. **Clone the repository**:
    ```bash
    git clone https://git.inf.uni-bayreuth.de/bt727270/praktikum.git
    cd praktikum
    ```
 
-2. Install dependencies:
+2. **Start the database (PostgreSQL)**:
+   In the root directory, run Docker Compose to spin up the database container:
    ```bash
-   npm install
-   cd backend && pip install -e .
+   docker compose up -d
    ```
 
-3. Configure environment variables:
-   Create a `.env` file in the root directory:
+3. **Install dependencies**:
+   Run the installation recipe from the Makefile in the root directory:
    ```bash
-   cp .env.example .env
+   make install
    ```
-   Edit `.env` and add your API keys. EventLogSim supports multiple providers:
-   - **DeepSeek**: Set `DS_API_KEY`
-   - **OpenAI**: Set `OPENAI_API_KEY`
-   - **Google Gemini**: Set `GOOGLE_API_KEY`
+   *(Or manually run `npm install` in `frontend/` and `uv sync` in `backend/`)*.
 
-   The system will automatically detect and use the available key (prioritizing DeepSeek, then OpenAI, then Gemini).
-
-### Development
-
-1. Start the backend:
+4. **Configure environment variables**:
+   Create a `.env` file inside the `backend/` directory:
    ```bash
    cd backend
-   uvicorn main:app --reload
+   cp .env.example .env
    ```
+   Edit `backend/.env` and add:
+   * Your LLM API key (e.g. `DS_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`).
+   * The database connection URL:
+     `DATABASE_URL=postgresql+asyncpg://db_user:db_password@localhost:5432/eventlogsim`
 
-2. Start the frontend:
+### Running the Application
+
+1. **Start the Development Servers**:
+   In the root directory, run:
    ```bash
-   npm run dev
+   make dev
    ```
+   This starts both the Vite frontend server (http://localhost:5173) and the FastAPI backend server (http://localhost:8000) concurrently.
 
-### Build
+2. **Starting Manually (Optional)**:
+   * **Backend**:
+     ```bash
+     cd backend
+     uv run uvicorn main:app --reload
+     ```
+   * **Frontend**:
+     ```bash
+     cd frontend
+     npm run dev
+     ```
 
-Create a production-ready build:
-```bash
-npm run build
-```
 
 ##  Project Structure
 
