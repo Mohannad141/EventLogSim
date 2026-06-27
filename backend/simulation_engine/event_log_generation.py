@@ -44,16 +44,16 @@ def append_event_to_process(event_log: List[dict], process_id: str, event: dict)
     })
 
 # Hard safety cap: regardless of caseCount, never make more than this many
-# coordinator iterations in a single run. Each iteration is ~2 LLM calls,
-# so 50 iterations ≈ 100 LLM calls — a sane upper bound for accidental
-# 5000-case inputs that would otherwise burn through API credit.
-MAX_TOTAL_ITERATIONS_HARD_CAP = 50
+# coordinator iterations in a single run.
+# Increased to 200 to allow longer cases and larger runs to finish naturally.
+MAX_TOTAL_ITERATIONS_HARD_CAP = 200
 
 
 def generate_event_log(
     config: Any, # SimulationRunConfig
-    max_events_per_case: int = 5,
+    max_events_per_case: int = 10,
 ):
+
 
     # Prepare agents
     agents = build_agents_from_config(config.agents)
