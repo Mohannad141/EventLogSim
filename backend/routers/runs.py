@@ -1,160 +1,227 @@
+import asyncio
 import json
+import time
 import uuid
-import random
-from datetime import datetime, timedelta
-from typing import Optional
-from fastapi import APIRouter, Form, UploadFile, File, HTTPException
+from collections import Counter, defaultdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Form, UploadFile, File, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from schema.config import SimulationRunConfig
-from database import (
-    create_run_in_db,
-    get_all_runs,
-    get_run_by_id,
-    update_run_stats_events
-)
+from db.session import get_db
+from db import crud
+
 router = APIRouter()
 
+ESSENTIAL_ATTRIBUTE_NAMES = {"caseId", "activity", "timestamp"}
 
-def generate_simulation_data(config):
-    """
-    Implements the Event Log Generation logic from Lecture 04 (Slide 27).
-    Uses the provided agents, attributes, and case count to create a realistic log.
-    """
-    case_count = config["simulation"].get("caseCount", 10)
-    seed = config["simulation"].get("seed")
-    rng = random.Random(seed)
-    
-    agents = config.get("agents", [])
-    attributes = config.get("attributes", [])
-    custom_attrs = [a for a in attributes if not a.get("locked")]
-    
-    # Generic activities to choose from
-    base_activities = ["Registration", "Data Validation", "Security Check", "Processing", "Approval", "Notification"]
-    
-    events = []
-    variants = {}
+# Per-run lock to prevent concurrent LLM generation for the same run id
+# (React strict mode and double-clicks would otherwise trigger generation
+# twice and double the cost).
+_generation_locks: Dict[str, asyncio.Lock] = {}
+_locks_guard = asyncio.Lock()
 
-    for i in range(case_count):
-        case_id = f"CASE-{i+1:04d}"
-        
-        # Determine a random sequence length for this case
-        num_events = rng.randint(3, 7)
-        # Sequence: Start -> Middle -> End
-        case_activities = ["Registration"] + [rng.choice(base_activities[1:-1]) for _ in range(num_events - 2)] + ["Notification"]
-        
-        # Track the trace variant
-        trace = tuple(case_activities)
-        variants[trace] = variants.get(trace, 0) + 1
 
-        # Start time for this case
-        timestamp = datetime.now() - timedelta(days=rng.randint(0, 3), hours=rng.randint(0, 23))
+async def _get_run_lock(run_id: str) -> asyncio.Lock:
+    async with _locks_guard:
+        if run_id not in _generation_locks:
+            _generation_locks[run_id] = asyncio.Lock()
+        return _generation_locks[run_id]
 
-        for activity in case_activities:
-            # Pick a RANDOM agent from the user's list (Lecture pattern)
-            if agents:
-                agent = rng.choice(agents)
-            else:
-                agent = {"name": "System", "role": "Automated"}
-            
-            # Populate custom attributes with randomized data
-            attr_values = {}
-            for attr in custom_attrs:
-                name = attr["name"]
-                a_type = attr["type"]
-                if a_type == "number":
-                    attr_values[name] = rng.randint(1, 100)
-                elif a_type == "string":
-                    attr_values[name] = rng.choice(["Standard", "Priority", "Express", "Internal"])
-                elif a_type == "datetime":
-                    attr_values[name] = (timestamp + timedelta(minutes=rng.randint(1, 30))).isoformat()
-                else:
-                    attr_values[name] = "N/A"
 
-            events.append({
-                "caseId": case_id,
-                "activity": activity,
-                "timestamp": timestamp.isoformat(),
-                "resource": agent.get("name", "N/A"),
-                "role": agent.get("role", "N/A"),
-                "attributes": attr_values
-            })
-            
-            # Advance time for the next step
-            timestamp += timedelta(hours=rng.randint(1, 4))
 
-    # Calculate distributions
-    event_distribution = {}
+def compute_stats(
+    events: List[Dict[str, Any]],
+    config_snapshot: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Aggregate generated events into the stats shape the frontend renders."""
+    case_to_seq: Dict[str, List[str]] = defaultdict(list)
+    activity_counter: Counter = Counter()
+
     for ev in events:
-        act = ev["activity"]
-        event_distribution[act] = event_distribution.get(act, 0) + 1
+        case_id = ev.get("caseId")
+        activity = ev.get("activity")
+        if case_id and activity:
+            case_to_seq[case_id].append(activity)
+            activity_counter[activity] += 1
 
-    sorted_variants = sorted(variants.items(), key=lambda x: x[1], reverse=True)
-    top_variants = [{
-        "activities": list(v[0]),
-        "count": v[1],
-        "percentage": round((v[1] / case_count) * 100, 1)
-    } for v in sorted_variants[:5]]
+    variant_counter: Counter = Counter()
+    for seq in case_to_seq.values():
+        variant_counter[tuple(seq)] += 1
 
-    stats = {
+    case_count = len(case_to_seq)
+    denom = case_count if case_count > 0 else 1
+
+    top_variants = [
+        {
+            "sequence": list(seq),
+            "count": count,
+            "percentage": round(100 * count / denom, 1),
+        }
+        for seq, count in variant_counter.most_common(5)
+    ]
+
+    custom_attr_names: List[str] = []
+    if config_snapshot:
+        for attr in config_snapshot.get("attributes") or []:
+            name = attr.get("name")
+            if (
+                name
+                and not attr.get("locked")
+                and name not in ESSENTIAL_ATTRIBUTE_NAMES
+            ):
+                custom_attr_names.append(name)
+
+    attribute_distribution: List[Dict[str, Any]] = []
+    for name in custom_attr_names:
+        value_counter: Counter = Counter()
+        for ev in events:
+            attrs = ev.get("attributes") or {}
+            if name in attrs:
+                value_counter[str(attrs[name])] += 1
+        if value_counter:
+            attribute_distribution.append({
+                "name": name,
+                "values": [
+                    {"value": value, "count": count}
+                    for value, count in value_counter.most_common(20)
+                ],
+            })
+
+    return {
         "caseCount": case_count,
         "eventCount": len(events),
-        "variantCount": len(variants),
-        "eventDistribution": [{"activity": k, "count": v} for k, v in event_distribution.items()],
-        "attributeDistribution": [], 
-        "topVariants": top_variants
+        "variantCount": len(variant_counter),
+        "eventDistribution": [
+            {"activity": activity, "count": count}
+            for activity, count in activity_counter.most_common()
+        ],
+        "attributeDistribution": attribute_distribution,
+        "topVariants": top_variants,
     }
-    
-    return stats, events
+
+
+def attach_bpmn_content(
+    config_dict: Dict[str, Any],
+    bpmn_file: Optional[UploadFile],
+    raw_bytes: Optional[bytes],
+) -> None:
+    """Inline the uploaded BPMN text into config.process.bpmnFile.content."""
+    if not bpmn_file or raw_bytes is None:
+        return
+    process = config_dict.setdefault("process", {})
+    meta = process.get("bpmnFile") or {}
+    try:
+        content = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        content = raw_bytes.decode("utf-8", errors="replace")
+    process["bpmnFile"] = {
+        "name": meta.get("name") or bpmn_file.filename or "process.bpmn",
+        "size": meta.get("size") or len(raw_bytes),
+        "content": content,
+    }
+
+
+def with_snapshot_alias(run: Dict[str, Any]) -> Dict[str, Any]:
+    """Expose the stored `config` as `configSnapshot` for the frontend."""
+    response = dict(run)
+    response.setdefault("configSnapshot", run.get("config") or {})
+    return response
+
 
 @router.post("/runs")
 async def create_run(
     config: str = Form(...),
-    bpmn: Optional[UploadFile] = File(None)
+    bpmn: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db)
 ):
     try:
         config_dict = json.loads(config)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format for config")
 
+    bpmn_bytes = await bpmn.read() if bpmn is not None else None
+    attach_bpmn_content(config_dict, bpmn, bpmn_bytes)
+
     try:
         valid_config = SimulationRunConfig(**config_dict)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Configuration validation failed: {str(e)}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Configuration validation failed: {e}",
+        )
 
     run_id = str(uuid.uuid4())
-    current_time = datetime.now().isoformat()
+    desc = (valid_config.process.description or "").strip()
+    if desc:
+        config_name = desc[:30] + "..." if len(desc) > 30 else desc
+    else:
+        config_name = "Untitled run"
 
-    run = {
-    "id": run_id,
-    "status": "completed",
-    "createdAt": current_time,
-    "config": valid_config.dict(),
-    "configName": valid_config.process.description[:30]
-        + "..."
-        if len(valid_config.process.description) > 30
-        else valid_config.process.description,
-    }
-
-    create_run_in_db(run)
-    return run
+    record = await crud.create_run(db, run_id, valid_config.model_dump(), config_name)
+    return with_snapshot_alias(record)
 
 
 @router.get("/runs")
-def list_runs():
-    return {"runs": get_all_runs()}
+async def list_runs(db: AsyncSession = Depends(get_db)):
+    runs = await crud.get_runs(db)
+    return {"runs": [with_snapshot_alias(run) for run in runs]}
 
 
 @router.get("/runs/{run_id}")
-def get_run_detail(run_id: str):
-    
-    run = get_run_by_id(run_id)
-
+async def get_run_detail(run_id: str, db: AsyncSession = Depends(get_db)):
+    run = await crud.get_run_by_id(db, run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    if not run.get("stats"):
-        stats, events = generate_simulation_data(run["config"])
-        run["stats"] = stats
-        run["events"] = events
-        update_run_stats_events(run_id, stats, events)
+    if run.get("status") in ("completed", "failed") and run.get("stats") is not None:
+        return with_snapshot_alias(run)
 
-    return run
+    # Serialize concurrent generations for the same run id.
+    lock = await _get_run_lock(run_id)
+    async with lock:
+        # Re-check: another concurrent request may have just finished generating.
+        run = await crud.get_run_by_id(db, run_id)
+        if run.get("status") in ("completed", "failed") and run.get("stats") is not None:
+            return with_snapshot_alias(run)
+
+        config_snapshot = run.get("config") or {}
+
+        # Try to rebuild the Pydantic config first; bail early on bad stored data.
+        try:
+            valid_config = SimulationRunConfig(**config_snapshot)
+        except Exception as e:
+            stats = compute_stats([], config_snapshot)
+            await crud.save_failed_run(db, run_id, f"Stored config is invalid: {e}", stats)
+            updated_run = await crud.get_run_by_id(db, run_id)
+            return with_snapshot_alias(updated_run)
+
+        # Lazy import: event_log_generation initializes the LLM at module load.
+        try:
+            from simulation_engine.event_log_generation import generate_event_log
+        except Exception as e:
+            stats = compute_stats([], config_snapshot)
+            await crud.save_failed_run(db, run_id, f"Simulation engine unavailable: {e}", stats)
+            updated_run = await crud.get_run_by_id(db, run_id)
+            return with_snapshot_alias(updated_run)
+
+        started = time.time()
+        try:
+            # generate_event_log is a blocking synchronous LLM generation call.
+            # To prevent blocking the async event loop during long LLM calls,
+            # we run it in a threadpool.
+            from fastapi.concurrency import run_in_threadpool
+            events = await run_in_threadpool(generate_event_log, valid_config)
+            
+            stats = compute_stats(events, config_snapshot)
+            duration = int((time.time() - started) * 1000)
+            await crud.save_completed_run(db, run_id, events, stats, duration)
+        except Exception as e:
+            stats = compute_stats([], config_snapshot)
+            await crud.save_failed_run(db, run_id, str(e), stats)
+
+        updated_run = await crud.get_run_by_id(db, run_id)
+        return with_snapshot_alias(updated_run)
+

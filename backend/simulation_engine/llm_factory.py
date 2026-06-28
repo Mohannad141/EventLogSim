@@ -7,8 +7,18 @@ load_dotenv()
 
 def get_llm():
     #Factory function to get the LLM based on environment variables.
+
+    # 1. FAU HPC (OwlChat) - Default
+    hpc_key = os.getenv("HPC_API_KEY")
+    if hpc_key:
+        return ChatOpenAI(
+            model=os.getenv("HPC_MODEL_NAME", "gpt-oss-120b"),
+            openai_api_key=hpc_key,
+            openai_api_base="https://hub.nhr.fau.de/api/llmgw/v1",
+            temperature=0.7
+        )
     
-    # 1. DeepSeek (Default if key is present)
+    # 2. DeepSeek
     ds_key = os.getenv("DS_API_KEY")
     if ds_key:
         return ChatOpenAI(
@@ -17,7 +27,7 @@ def get_llm():
             openai_api_base="https://api.deepseek.com"
         )
     
-    # 2. OpenAI (Commented out example or used if key is present)
+    # 3. OpenAI
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
         return ChatOpenAI(
@@ -25,7 +35,7 @@ def get_llm():
             openai_api_key=openai_key
         )
     
-    # 3. Google Gemini (Used if key is present)
+    # 4. Google Gemini
     gemini_key = os.getenv("GOOGLE_API_KEY")
     if gemini_key:
         return ChatGoogleGenerativeAI(
@@ -33,13 +43,23 @@ def get_llm():
             google_api_key=gemini_key
         )
     
-    # 4. GROQ (Default if key is present)
+    # 5. GROQ
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         return ChatOpenAI(
             model="llama-3.3-70b-versatile",
         openai_api_key=groq_key,
         openai_api_base="https://api.groq.com/openai/v1"
+        )
+    
+    # 5. HPC (Used if key is present)
+    hpc_key = os.getenv("HPC_API_KEY")
+    if hpc_key:
+        return ChatOpenAI(
+            model=os.getenv("HPC_MODEL_NAME", "gpt-oss-120b"),
+            openai_api_key=hpc_key,
+            openai_api_base="https://hub.nhr.fau.de/api/llmgw/v1",
+            temperature=0.7
         )
 
     # Fallback or Error

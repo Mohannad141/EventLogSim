@@ -1,5 +1,7 @@
 import os
+import random
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta
@@ -11,6 +13,7 @@ if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from simulation_engine.actor import Agent, GeneratedEvent
+from simulation_engine.bpmn_parser import parse_bpmn
 from simulation_engine.coordinator import Coordinator
 from simulation_engine.process import (
     get_current_process,
@@ -40,10 +43,18 @@ def append_event_to_process(event_log: List[dict], process_id: str, event: dict)
         "events": [event],
     })
 
+# Hard safety cap: regardless of caseCount, never make more than this many
+# coordinator iterations in a single run.
+# Increased to 200 to allow longer cases and larger runs to finish naturally.
+MAX_TOTAL_ITERATIONS_HARD_CAP = 200
+
+
 def generate_event_log(
     config: Any, # SimulationRunConfig
-    max_events_per_case: int = 5,
+    max_events_per_case: int = 10,
 ):
+
+
     # Prepare agents
     agents = build_agents_from_config(config.agents)
     agents_by_id = {agent.id: agent for agent in agents}
@@ -59,9 +70,34 @@ def generate_event_log(
     ]
 
     coordinator = Coordinator()
-    
+
     # Extract terminal actions or use defaults
     terminal_actions = ["Finish", "End", "Archive", "Complete", "Close Case"]
+    transitions: Optional[Dict[str, Any]] = None
+
+    # BPMN mode: parse the uploaded .bpmn content and use its transitions
+    # and terminal actions to constrain the simulation.
+    bpmn_file = getattr(config.process, "bpmnFile", None)
+    if (
+        getattr(config.process, "mode", None) == "BPMN_BASED"
+        and isinstance(bpmn_file, dict)
+        and bpmn_file.get("content")
+    ):
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                suffix=".bpmn", delete=False, mode="w", encoding="utf-8"
+            ) as tmp:
+                tmp.write(bpmn_file["content"])
+                tmp_path = tmp.name
+            bpmn_data = parse_bpmn(tmp_path)
+            transitions = bpmn_data.get("transitions") or None
+            bpmn_terminals = bpmn_data.get("terminal_actions") or []
+            if bpmn_terminals:
+                terminal_actions = bpmn_terminals
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
 
     process_ids = [case["process_id"] for case in events_by_case]
     
@@ -74,28 +110,59 @@ def generate_event_log(
         }
     }
 
-    max_total_events = len(process_ids) * max_events_per_case
+    max_total_events = min(
+        len(process_ids) * max_events_per_case,
+        MAX_TOTAL_ITERATIONS_HARD_CAP,
+    )
 
     for step_index in range(max_total_events):
-        # Get unfinished cases
+        # Get unfinished cases (cases that already reached max_events_per_case
+        # events are auto-finished here to prevent the coordinator from
+        # looping on the same case forever — the structural fix for the
+        # "agents talking in circles" scenario).
         unfinished_process_states = get_unfinished_process_states(
             process_ids=process_ids,
             events=events_by_case,
             terminal_actions=terminal_actions,
+            transitions=transitions,
+            max_events_per_case=max_events_per_case,
         )
 
         if not unfinished_process_states:
+            print("--- All cases finished naturally ---")
             break
 
-        # Call coordinator
+        # Shuffle to prevent "batching" behavior and introduce randomness
+        random.shuffle(unfinished_process_states)
+
+        # Limit to max 10 states to prevent prompt bloat and LLM confusion
+        coordinator_states = unfinished_process_states[:10]
+
+        # 2. Call coordinator to assign ONE case to ONE agent with fallback
         try:
             assignment = coordinator.assign_agent_project(
                 llm=llm,
-                process_states=unfinished_process_states,
+                process_states=coordinator_states,
                 agents=[agent.model_dump() for agent in agents],
+                process_summary=config.process.description
             )
+            
+            # Validate coordinator output
+            process_ids_set = {state["process_id"] for state in coordinator_states}
+            agent_ids_set = {agent.id for agent in agents}
+            
+            if assignment.process_id not in process_ids_set or assignment.agent_id not in agent_ids_set:
+                raise ValueError("Coordinator returned invalid process_id or agent_id")
+                
         except Exception as e:
-            print(f"Coordinator error: {e}")
+            # If we never produced an event, the run is a total failure —
+            # re-raise so the caller marks status="failed" with a useful
+            # message instead of silently returning an empty list.
+            has_any_events = any(case["events"] for case in events_by_case)
+            if not has_any_events:
+                raise RuntimeError(f"Coordinator failed on first step: {e}") from e
+            # Partial data already collected — keep it and stop the loop.
+            print(f"Coordinator error (stopping early with partial data): {e}")
             break
 
         # Prepare context for the actor
@@ -105,7 +172,6 @@ def generate_event_log(
         )
         current_process["coordinator_message"] = assignment.message or "Please proceed with the next step."
 
-        # Call actor
         agent = agents_by_id[assignment.agent_id]
         try:
             generated_event: GeneratedEvent = agent.generate_single_event(
@@ -114,10 +180,20 @@ def generate_event_log(
                 llm=llm,
             )
 
-            # Add to our internal tracking for the loop
+            # Add to our internal tracking
             ev_data = generated_event.model_dump()
             ev_data["agent_id"] = agent.id
-            ev_data["timestamp"] = (datetime.now() + timedelta(minutes=step_index * 15)).isoformat()
+            
+            # Advance timestamp by 15-45 minutes per step for realism
+            prev_events = current_process.get("previous_events", [])
+            if prev_events:
+                last_time = datetime.fromisoformat(prev_events[-1].get("timestamp"))
+                new_time = last_time + timedelta(minutes=random.randint(15, 45))
+            else:
+                # Base starting time for the very first event of a case
+                new_time = datetime.now() + timedelta(minutes=step_index * 5)
+            
+            ev_data["timestamp"] = new_time.isoformat()
             append_event_to_process(events_by_case, assignment.process_id, ev_data)
             
         except Exception as e:
@@ -131,13 +207,24 @@ def generate_event_log(
         for ev in case["events"]:
             agent_obj = agents_by_id.get(ev.get("agent_id"))
             
+            # Combine attributes from both event_data and case_data for safety
+            combined_attributes = {}
+            for field in ["event_data", "case_data"]:
+                for attr in ev.get(field) or []:
+                    if isinstance(attr, dict):
+                        combined_attributes[attr["attribute"]] = attr["value"]
+                    else:
+                        combined_attributes[attr.attribute] = attr.value
+            
             final_events.append({
                 "caseId": p_id,
                 "activity": ev["action"],
                 "timestamp": ev.get("timestamp", datetime.now().isoformat()),
+                "is_terminal": ev.get("is_terminal", False),
                 "resource": agent_obj.id if agent_obj else "Unknown",
                 "role": agent_obj.role if agent_obj else "Unknown",
-                "attributes": {attr["attribute"]: attr["value"] for attr in (ev.get("event_data") or [])}
+                "attributes": combined_attributes
             })
 
     return final_events
+

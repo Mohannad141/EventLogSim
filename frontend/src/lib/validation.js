@@ -8,14 +8,16 @@ const fail = (errors) => ({ valid: false, errors });
 
 export const validateProcess = (process = {}) => {
   const errors = {};
-  const desc = (process.description || '').trim();
 
-  if (desc.length < MIN_DESCRIPTION_LENGTH) {
-    errors.description = `Description must be at least ${MIN_DESCRIPTION_LENGTH} characters.`;
-  }
-
-  if (process.mode === 'BPMN_BASED' && !process.bpmnFile) {
-    errors.bpmnFile = 'A BPMN file is required when using BPMN-based mode.';
+  if (process.mode === 'BPMN_BASED') {
+    if (!process.bpmnFile) {
+      errors.bpmnFile = 'A BPMN file is required when using BPMN-based mode.';
+    }
+  } else {
+    const desc = (process.description || '').trim();
+    if (desc.length < MIN_DESCRIPTION_LENGTH) {
+      errors.description = `Description must be at least ${MIN_DESCRIPTION_LENGTH} characters.`;
+    }
   }
 
   return Object.keys(errors).length === 0 ? ok() : fail(errors);

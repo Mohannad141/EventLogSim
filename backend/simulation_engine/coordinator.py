@@ -13,17 +13,39 @@ MAX_DEBUG_PRINTS = 3
 ASSIGNMENT_PROMPT = """\
 You are the coordinator of a process simulation.
 
+Process Goal/Summary: {process_summary}
+
 Your task is to assign one unfinished process instance to one suitable agent.
 
-Unfinished process instances:
+Unfinished process instances (with history and current data):
 {process_states}
 
-Available agents:
+Available agents (with roles and capabilities):
 {agents}
 
-Choose exactly one process_id and one agent_id from the provided lists.
-Prefer an agent whose role and actions fit the current process state.
-Write a short message to the selected agent.
+Each process instance may include an "allowed_next_actions" field listing the actions
+that are permitted as the next step. If "allowed_next_actions" is present and non-empty
+for the instance you choose, the next action MUST be one of those, and you MUST pick an
+agent whose own "actions" list includes at least one of those allowed actions.
+If "allowed_next_actions" is missing or empty, use your own judgement and prefer an
+agent whose role and actions fit the current process state.
+
+Spread work across cases: among the unfinished instances, prefer the one with the
+LOWEST "number_of_events" so every case advances roughly in parallel. Avoid
+repeatedly returning to a case that is already further along while other cases
+have zero events.
+
+Also vary the chosen agent and action when possible — do not keep assigning the
+same agent to the same case over and over with the same action; that produces an
+unrealistic event log.
+
+INSTRUCTIONS:
+1. Choose exactly one process_id and one agent_id.
+2. Review the "History" in the process state. Do NOT repeat the same action if it was already successful.
+3. Choose an agent whose role makes sense for the NEXT step in the process goal.
+4. If a hand-off is needed (e.g., from an 'Initial Phase' role to a 'Specialist' role), pick the new role now.
+
+Write a short message to the selected agent explaining what they should do next.
 
 {format_instructions}
 """
@@ -42,6 +64,7 @@ class Coordinator(BaseModel):
         llm: Any,
         process_states: List[Dict[str, Any]],
         agents: List[Dict[str, Any]],
+        process_summary: str = "A business process."
     ) -> AgentProcessAssignment:
         
         if not process_states:
@@ -55,11 +78,12 @@ class Coordinator(BaseModel):
 
         prompt_template = PromptTemplate(
             template=ASSIGNMENT_PROMPT,
-            input_variables=["process_states", "agents"],
+            input_variables=["process_states", "agents", "process_summary"],
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
         
         prompt = prompt_template.format(
+            process_summary=process_summary,
             process_states=json.dumps(process_states, indent=2),
             agents=json.dumps(agents, indent=2),
         )

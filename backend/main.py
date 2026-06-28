@@ -1,17 +1,24 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from database import init_db
 
 from routers.runs import router as runs_router
+from db.session import init_db
 
-app = FastAPI()
-init_db()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Setup database on startup
+    await init_db()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(runs_router, prefix="/api", tags=["runs"])
 
 def main():
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
 
 app.add_middleware(
     CORSMiddleware,

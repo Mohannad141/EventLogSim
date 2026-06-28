@@ -1,4 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+from simulation_engine.bpmn_parser import get_allowed_next_actions
 
 
 def get_process_context(config_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -76,14 +78,22 @@ def get_business_events(events: List[Any]) -> List[Any]:
     ]
 
 
+def get_last_action(events: List[Any]) -> Optional[str]:
+    business_events = get_business_events(events)
+    if not business_events:
+        return None
+    return get_event_value(business_events[-1], "action")
+
+
 def get_current_process(process_id: str, events: List[Any]) -> Dict[str, Any]:
     process_events = get_events_for_process(process_id, events)
     business_events = get_business_events(process_events)
+    case_data = collect_case_data(process_events)
 
     return {
         "process_id": process_id,
-        "process_state": describe_process_state(business_events),
-        "case_data": collect_case_data(process_events),
+        "process_state": describe_process_state(business_events, case_data),
+        "case_data": case_data,
         "previous_events": process_events,
     }
 
@@ -92,49 +102,100 @@ def get_unfinished_process_states(
     process_ids: List[str],
     events: List[Any],
     terminal_actions: List[str],
+    transitions: Optional[Dict[str, Any]] = None,
+    max_events_per_case: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
-    return [
-        {
+    result: List[Dict[str, Any]] = []
+    for process_id in process_ids:
+        if is_process_finished(process_id, events, terminal_actions, max_events_per_case):
+            continue
+        process_events = get_events_for_process(process_id, events)
+        business_events = get_business_events(process_events)
+        case_data = collect_case_data(process_events)
+        allowed_next_actions = (
+            get_allowed_next_actions(transitions, get_last_action(process_events))
+            if transitions
+            else []
+        )
+        result.append({
             "process_id": process_id,
-            "process_state": describe_process_state(get_business_events(get_events_for_process(process_id, events))),
-            "case_data": collect_case_data(get_events_for_process(process_id, events)),
-            "number_of_events": len(get_business_events(get_events_for_process(process_id, events))),
-        }
-        for process_id in process_ids
-        if not is_process_finished(process_id, events, terminal_actions)
-    ]
+            "process_state": describe_process_state(business_events, case_data),
+            "case_data": case_data,
+            "number_of_events": len(business_events),
+            "allowed_next_actions": allowed_next_actions,
+        })
+
+    return result
 
 
 def is_process_finished(
     process_id: str,
     events: List[Any],
     terminal_actions: List[str],
+    max_events_per_case: Optional[int] = None,
 ) -> bool:
     process_events = get_business_events(get_events_for_process(process_id, events))
 
     if not process_events:
         return False
 
+    # Safety net: even if the LLM never reaches a terminal action (common when
+    # agent.actions doesn't overlap with terminal_actions), force the case to
+    # finish after max_events_per_case events. Without this the coordinator
+    # can loop forever on the same case, burning tokens.
+    if max_events_per_case is not None and len(process_events) >= max_events_per_case:
+        return True
+
     last_event = process_events[-1]
-    return get_event_value(last_event, "action") in terminal_actions
+    
+    # 1. Check if the LLM agent explicitly marked the last action as terminal
+    if get_event_value(last_event, "is_terminal") is True:
+        return True
+
+    last_action = get_event_value(last_event, "action")
+    if not last_action:
+        return False
+
+    last_action_lower = last_action.lower()
+
+    # 2. Fallback: Check exact case-insensitive matches with specified terminal actions
+    for term in terminal_actions:
+        if last_action_lower == term.lower():
+            return True
+
+    # 3. Fallback: Check for typical halting keywords in the action text (e.g. "Resolve Ticket", "Close Case")
+    halting_keywords = ["finish", "end", "archive", "complete", "close", "resolve", "terminate"]
+    for keyword in halting_keywords:
+        if keyword in last_action_lower:
+            return True
+
+    return False
 
 
-def describe_process_state(events: List[Any]) -> str:
+
+
+def describe_process_state(events: List[Any], case_data: Dict[str, str]) -> str:
     if not events:
-        return "No event has happened yet."
+        return "Process has just started. No actions taken yet."
 
-    last_event = events[-1]
-    return f"Last action: {get_event_value(last_event, 'action')}"
+    history = " -> ".join([get_event_value(e, "action") for e in events])
+    
+    data_summary = ""
+    if case_data:
+        data_summary = "\nCurrently collected data: " + ", ".join([f"{k}={v}" for k, v in case_data.items()])
+
+    return f"History: {history}.{data_summary}"
 
 
 def collect_case_data(events: List[Any]) -> Dict[str, str]:
     case_data: Dict[str, str] = {}
 
     for event in events:
-        for item in get_event_value(event, "case_data", []) or []:
-            if isinstance(item, dict):
-                case_data[item["attribute"]] = item["value"]
-            else:
-                case_data[item.attribute] = item.value
+        for field_name in ["case_data", "event_data"]:
+            for item in get_event_value(event, field_name, []) or []:
+                if isinstance(item, dict):
+                    case_data[item["attribute"]] = item["value"]
+                else:
+                    case_data[item.attribute] = item.value
 
     return case_data
