@@ -1,30 +1,18 @@
 import json
 import uuid
-import os
 import random
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Form, UploadFile, File, HTTPException
 from schema.config import SimulationRunConfig
-
+from database import (
+    create_run_in_db,
+    get_all_runs,
+    get_run_by_id,
+    update_run_stats_events
+)
 router = APIRouter()
 
-DB_FILE = "database.json"
-
-def load_db():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            try:
-                return json.load(f)
-            except:
-                return {}
-    return {}
-
-def save_db(data):
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
-fake_database = load_db()
 
 def generate_simulation_data(config):
     """
@@ -135,34 +123,38 @@ async def create_run(
     run_id = str(uuid.uuid4())
     current_time = datetime.now().isoformat()
 
-    fake_database[run_id] = {
-        "id": run_id,
-        "status": "completed",
-        "createdAt": current_time,
-        "config": valid_config.dict(),
-        "configName": valid_config.process.description[:30] + "..." if len(valid_config.process.description) > 30 else valid_config.process.description,
+    run = {
+    "id": run_id,
+    "status": "completed",
+    "createdAt": current_time,
+    "config": valid_config.dict(),
+    "configName": valid_config.process.description[:30]
+        + "..."
+        if len(valid_config.process.description) > 30
+        else valid_config.process.description,
     }
 
-    save_db(fake_database)
-    return fake_database[run_id]
+    create_run_in_db(run)
+    return run
 
 
 @router.get("/runs")
 def list_runs():
-    return {"runs": list(fake_database.values())}
+    return {"runs": get_all_runs()}
 
 
 @router.get("/runs/{run_id}")
 def get_run_detail(run_id: str):
-    if run_id not in fake_database:
-        raise HTTPException(status_code=404, detail="Run not found")
     
-    run = fake_database[run_id]
+    run = get_run_by_id(run_id)
 
-    if "stats" not in run:
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    if not run.get("stats"):
         stats, events = generate_simulation_data(run["config"])
         run["stats"] = stats
         run["events"] = events
-        save_db(fake_database)
+        update_run_stats_events(run_id, stats, events)
 
     return run

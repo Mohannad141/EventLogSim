@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from database import init_db
 
 from routers.runs import router as runs_router
 
 app = FastAPI()
+init_db()
 
 app.include_router(runs_router, prefix="/api", tags=["runs"])
 
