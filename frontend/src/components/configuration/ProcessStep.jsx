@@ -71,10 +71,10 @@ const ProcessStep = ({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-slate-950">
             Process
           </h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-slate-600">
             Choose how agents coordinate and describe the process they will
             simulate.
           </p>
@@ -100,10 +100,10 @@ const ProcessStep = ({
               <label
                 key={m.value}
                 className={cn(
-                  'flex cursor-pointer flex-col rounded-lg border p-4 transition-colors',
+                  'flex cursor-pointer flex-col rounded-2xl border p-5 transition-all duration-200',
                   selected
-                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600'
-                    : 'border-gray-300 bg-white hover:border-gray-400'
+                    ? 'border-sky-400 bg-sky-50 ring-2 ring-sky-200 shadow-sm'
+                    : 'border-slate-200 bg-white hover:border-sky-300 hover:shadow-sm'
                 )}
               >
                 <input
@@ -140,7 +140,7 @@ const ProcessStep = ({
             value={process.description}
             onChange={(e) => onChangeDescription(e.target.value)}
             placeholder="Describe the process in plain English. What is the goal? Who participates? What activities happen and in what order?"
-            className="mt-2"
+            className="mt-2 rounded-2xl border-slate-200 bg-white px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-200 focus:outline-none"
           />
           {errors.description && (
             <p className="mt-1 text-xs text-red-600">{errors.description}</p>
@@ -156,7 +156,7 @@ const ProcessStep = ({
           {process.bpmnFile ? (
             <div className="mt-2 flex items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
               <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-indigo-600" />
+                <FileText className="h-5 w-5 text-sky-600" />
                 <div>
                   <div className="text-sm font-medium text-gray-900">
                     {process.bpmnFile.name}
@@ -184,10 +184,10 @@ const ProcessStep = ({
               onDragLeave={() => setDragOver(false)}
               onDrop={onDrop}
               className={cn(
-                'mt-2 flex flex-col items-center justify-center rounded-md border-2 border-dashed px-6 py-8 transition-colors',
+                'mt-2 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 transition-colors',
                 dragOver
-                  ? 'border-indigo-500 bg-indigo-50'
-                  : 'border-gray-300 bg-gray-50'
+                  ? 'border-sky-400 bg-sky-50'
+                  : 'border-slate-300 bg-sky-50/40'
               )}
             >
               <Upload className="mb-2 h-6 w-6 text-gray-400" />

@@ -2,19 +2,19 @@ import { cn } from '../../utils/cn.js';
 
 const VARIANTS = {
   primary:
-    'bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600',
+    'bg-sky-500 text-white hover:bg-sky-600 focus-visible:outline-sky-500 shadow-sm',
   secondary:
-    'bg-white text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-gray-400',
+    'bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-sky-50 hover:ring-sky-200 focus-visible:outline-sky-300',
   ghost:
-    'bg-transparent text-gray-700 hover:bg-gray-100 focus-visible:outline-gray-400',
+    'bg-transparent text-slate-600 hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-sky-300',
   danger:
-    'bg-red-600 text-white hover:bg-red-500 focus-visible:outline-red-600',
+    'bg-red-500 text-white hover:bg-red-600 focus-visible:outline-red-500',
 };
 
 const SIZES = {
-  sm: 'px-2.5 py-1.5 text-sm rounded-md',
-  md: 'px-3.5 py-2 text-sm rounded-md',
-  lg: 'px-4 py-2.5 text-base rounded-md',
+  sm: 'px-3 py-2 text-sm rounded-xl',
+  md: 'px-4 py-2 text-sm rounded-xl',
+  lg: 'px-5 py-3 text-base rounded-xl',
 };
 
 const Button = ({

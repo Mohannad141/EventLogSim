@@ -3,7 +3,7 @@ import { cn } from '../../utils/cn.js';
 
 const StepIndicator = ({ steps, currentIndex, completion, onSelect }) => {
   return (
-    <ol className="flex items-center gap-0">
+    <ol className="flex items-center gap-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
       {steps.map((step, index) => {
         const isCurrent = index === currentIndex;
         const isComplete = !!completion?.[step.key];
@@ -19,12 +19,12 @@ const StepIndicator = ({ steps, currentIndex, completion, onSelect }) => {
             >
               <span
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ring-2 transition-colors',
+                  'flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ring-2 transition-colors',
                   isCurrent
-                    ? 'bg-indigo-600 text-white ring-indigo-600'
+                    ? 'bg-sky-500 text-white ring-sky-200 shadow-sm'
                     : isComplete
-                      ? 'bg-green-600 text-white ring-green-600'
-                      : 'bg-white text-gray-500 ring-gray-300 group-hover:ring-gray-400'
+                      ? 'bg-sky-100 text-sky-700 ring-sky-200'
+                      : 'bg-white text-slate-500 ring-slate-200 group-hover:ring-sky-200'
                 )}
               >
                 {isComplete && !isCurrent ? (
@@ -37,10 +37,10 @@ const StepIndicator = ({ steps, currentIndex, completion, onSelect }) => {
                 className={cn(
                   'text-sm transition-colors',
                   isCurrent
-                    ? 'font-semibold text-gray-900'
+                    ? 'font-semibold text-slate-950'
                     : isComplete
-                      ? 'font-medium text-gray-700'
-                      : 'text-gray-500 group-hover:text-gray-700'
+                      ? 'font-medium text-sky-700'
+                      : 'text-slate-500 group-hover:text-sky-700'
                 )}
               >
                 {step.label}
@@ -50,7 +50,7 @@ const StepIndicator = ({ steps, currentIndex, completion, onSelect }) => {
               <span
                 className={cn(
                   'mx-3 h-px flex-1',
-                  isComplete ? 'bg-green-300' : 'bg-gray-200'
+                  isComplete ? 'bg-sky-200' : 'bg-slate-200'
                 )}
                 aria-hidden="true"
               />

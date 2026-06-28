@@ -178,13 +178,14 @@ const ConfigurationPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+    <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+         <div> 
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
             Configuration
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-slate-600">
             Set up agents, the process, attributes, and the simulation.
           </p>
         </div>
@@ -196,6 +197,8 @@ const ConfigurationPage = () => {
           <RotateCcw className="mr-1 h-3.5 w-3.5" />
           Reset all
         </Button>
+        </div>
+
       </div>
 
       <StepIndicator
@@ -205,7 +208,9 @@ const ConfigurationPage = () => {
         onSelect={setCurrentIndex}
       />
 
-      <Card>{renderStep()}</Card>
+      <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
+  {renderStep()}
+</div>
 
       {error && (
         <div

@@ -57,7 +57,7 @@ const SimulationStep = ({
         >
           Number of cases
         </label>
-        <div className="mt-2 flex items-center gap-4">
+        <div className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 focus:border-sky-400 focus:ring-2 focus:ring-sky-200 focus:outline-none">
           <Input
             id="case-count"
             type="number"
@@ -76,7 +76,7 @@ const SimulationStep = ({
               MAX_CASES
             )}
             onChange={(e) => handleCaseCountChange(e.target.value)}
-            className="flex-1 accent-indigo-600"
+            className="w-full "
           />
           <span className="w-16 text-right text-xs text-gray-500">
             {MIN_CASES}–{MAX_CASES}
@@ -96,9 +96,9 @@ const SimulationStep = ({
           title={canRun ? undefined : runDisabledReason}
         >
           {submitting ? (
-            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            <Loader2 className="rounded-xl bg-sky-500 text-white shadow-sm hover:bg-sky-600" />
           ) : (
-            <Play className="mr-1.5 h-4 w-4" />
+            <Play className="rounded-xl bg-sky-500 text-white shadow-sm hover:bg-sky-600" />
           )}
           {submitting ? 'Running…' : 'Run Simulation'}
         </Button>

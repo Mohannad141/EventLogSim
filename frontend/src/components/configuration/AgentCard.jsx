@@ -15,7 +15,7 @@ const AgentCard = ({ agent, onEdit, onDelete }) => {
     <Card className="relative flex flex-col gap-3 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white">
+          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-2xl bg-sky-100 text-sm font-bold text-sky-700">
             {initialsOf(agent.name)}
           </div>
           <div>

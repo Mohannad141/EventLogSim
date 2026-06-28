@@ -45,7 +45,7 @@ const RunDetailPage = () => {
       <div>
         <Link
           to="/runs"
-          className="inline-flex items-center gap-1 text-sm text-indigo-700 hover:text-indigo-900"
+          className="inline-flex items-center gap-1 text-sm text-sky-700 hover:text-sky-900"
         >
           <ChevronLeft className="h-4 w-4" />
           Back to runs
