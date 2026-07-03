@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from routers.runs import router as runs_router
+from routers.chat import router as chat_router
 from db.session import init_db
 
 @asynccontextmanager
@@ -15,6 +16,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(runs_router, prefix="/api", tags=["runs"])
+app.include_router(chat_router, prefix="/api", tags=["chat"])
 
 def main():
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

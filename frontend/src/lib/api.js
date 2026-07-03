@@ -75,3 +75,13 @@ export const listRuns = async () => {
 export const getRun = async (id) => {
   return request(`/api/runs/${encodeURIComponent(id)}`);
 };
+
+export const sendChatMessage = async (messages) => {
+  return request('/api/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ messages }),
+  });
+};

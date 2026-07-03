@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Home, Settings, History, Sparkles, Menu, X } from 'lucide-react';
 import { cn } from '../../utils/cn.js';
+import SidebarChatbot from './SidebarChatbot.jsx';
 
 const NAV_LINKS = [
   { to: '/', label: 'Dashboard', icon: Home, end: true },
@@ -63,13 +64,15 @@ const Sidebar = ({ isOpen, onToggle }) => {
       </nav>
 
       {isOpen && (
-
-      <div className="mt-auto rounded-3xl border border-sky-200 bg-white/60 p-4 shadow-sm">
-        <p className="text-sm font-semibold text-slate-900">Project Status</p>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
-          Generate, store and compare simulated event logs.
-        </p>
-      </div>
+        <div className="mt-auto space-y-3">
+          <SidebarChatbot />
+          <div className="rounded-3xl border border-sky-200 bg-white/60 p-4 shadow-sm">
+            <p className="text-sm font-semibold text-slate-900">Project Status</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Generate, store and compare simulated event logs.
+            </p>
+          </div>
+        </div>
       )}
     </aside>
   );
