@@ -9,6 +9,11 @@ const fail = (errors) => ({ valid: false, errors });
 export const validateProcess = (process = {}) => {
   const errors = {};
 
+  const name = (process.runName || '').trim();
+  if (name.length === 0) {
+    errors.runName = 'Run name is required.';
+  }
+
   if (process.mode === 'BPMN_BASED') {
     if (!process.bpmnFile) {
       errors.bpmnFile = 'A BPMN file is required when using BPMN-based mode.';

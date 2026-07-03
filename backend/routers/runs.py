@@ -154,11 +154,15 @@ async def create_run(
         )
 
     run_id = str(uuid.uuid4())
-    desc = (valid_config.process.description or "").strip()
-    if desc:
-        config_name = desc[:30] + "..." if len(desc) > 30 else desc
+    run_name = (valid_config.process.runName or "").strip()
+    if run_name:
+        config_name = run_name
     else:
-        config_name = "Untitled run"
+        desc = (valid_config.process.description or "").strip()
+        if desc:
+            config_name = desc[:30] + "..." if len(desc) > 30 else desc
+        else:
+            config_name = "Untitled run"
 
     record = await crud.create_run(db, run_id, valid_config.model_dump(), config_name)
     return with_snapshot_alias(record)

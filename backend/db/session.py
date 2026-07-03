@@ -59,6 +59,8 @@ async def init_db():
                     activity VARCHAR(100) NOT NULL,
                     timestamp TIMESTAMP NOT NULL,
                     is_terminal BOOLEAN DEFAULT FALSE,
+                    resource VARCHAR(100),
+                    role VARCHAR(100),
                     attributes JSONB,
                     FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
                 );
@@ -67,6 +69,12 @@ async def init_db():
             # Migration helper for existing databases
             await session.execute(text("""
                 ALTER TABLE events ADD COLUMN IF NOT EXISTS is_terminal BOOLEAN DEFAULT FALSE;
+            """))
+            await session.execute(text("""
+                ALTER TABLE events ADD COLUMN IF NOT EXISTS resource VARCHAR(100);
+            """))
+            await session.execute(text("""
+                ALTER TABLE events ADD COLUMN IF NOT EXISTS role VARCHAR(100);
             """))
             
             # Create index for faster querying of events by run_id

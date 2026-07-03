@@ -13,12 +13,13 @@ if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from simulation_engine.actor import Agent, GeneratedEvent
-from simulation_engine.bpmn_parser import parse_bpmn
+from simulation_engine.bpmn_parser import parse_bpmn, get_allowed_next_actions
 from simulation_engine.coordinator import Coordinator
 from simulation_engine.process import (
     get_current_process,
     get_process_context,
     get_unfinished_process_states,
+    get_last_action,
 )
 
 load_dotenv()
@@ -95,6 +96,22 @@ def generate_event_log(
             bpmn_terminals = bpmn_data.get("terminal_actions") or []
             if bpmn_terminals:
                 terminal_actions = bpmn_terminals
+
+            # Override agents if roles were extracted from BPMN pools/lanes
+            bpmn_roles = bpmn_data.get("roles") or {}
+            if bpmn_roles:
+                agents = []
+                for role_name, actions in bpmn_roles.items():
+                    clean_role = role_name.strip()
+                    role_id = f"agent_{clean_role.lower().replace(' ', '_')}"
+                    agents.append(Agent(
+                        id=role_id,
+                        role=clean_role,
+                        description=f"Automated agent simulating the role of {clean_role}.",
+                        actions=actions,
+                        age=None
+                    ))
+                agents_by_id = {agent.id: agent for agent in agents}
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
@@ -171,6 +188,14 @@ def generate_event_log(
             events=events_by_case,
         )
         current_process["coordinator_message"] = assignment.message or "Please proceed with the next step."
+        
+        # Calculate allowed next actions to pass to the agent
+        allowed_next = (
+            get_allowed_next_actions(transitions, get_last_action(current_process.get("previous_events", [])))
+            if transitions
+            else []
+        )
+        current_process["allowed_next_actions"] = allowed_next
 
         agent = agents_by_id[assignment.agent_id]
         try:
@@ -183,6 +208,34 @@ def generate_event_log(
             # Add to our internal tracking
             ev_data = generated_event.model_dump()
             ev_data["agent_id"] = agent.id
+
+            # Normalize action name to match allowed actions or agent's own actions case-insensitively
+            original_action = ev_data["action"]
+            normalized = False
+            
+            # 1. Match against allowed next actions
+            if allowed_next:
+                for act in allowed_next:
+                    if original_action.strip().lower() == act.strip().lower():
+                        ev_data["action"] = act
+                        normalized = True
+                        break
+            
+            # 2. Match against agent's own actions
+            if not normalized and agent.actions:
+                for act in agent.actions:
+                    if original_action.strip().lower() == act.strip().lower():
+                        ev_data["action"] = act
+                        normalized = True
+                        break
+
+            # If in BPMN mode, override is_terminal based on the actual BPMN transition
+            if transitions is not None:
+                next_after_current = get_allowed_next_actions(transitions, ev_data["action"])
+                if "END" in next_after_current or "end" in next_after_current or not next_after_current:
+                    ev_data["is_terminal"] = True
+                else:
+                    ev_data["is_terminal"] = False
             
             # Advance timestamp by 15-45 minutes per step for realism
             prev_events = current_process.get("previous_events", [])

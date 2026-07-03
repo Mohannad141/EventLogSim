@@ -107,7 +107,7 @@ def get_unfinished_process_states(
 ) -> List[Dict[str, Any]]:
     result: List[Dict[str, Any]] = []
     for process_id in process_ids:
-        if is_process_finished(process_id, events, terminal_actions, max_events_per_case):
+        if is_process_finished(process_id, events, terminal_actions, max_events_per_case, transitions):
             continue
         process_events = get_events_for_process(process_id, events)
         business_events = get_business_events(process_events)
@@ -133,6 +133,7 @@ def is_process_finished(
     events: List[Any],
     terminal_actions: List[str],
     max_events_per_case: Optional[int] = None,
+    transitions: Optional[Dict[str, Any]] = None,
 ) -> bool:
     process_events = get_business_events(get_events_for_process(process_id, events))
 
@@ -148,13 +149,38 @@ def is_process_finished(
 
     last_event = process_events[-1]
     
-    # 1. Check if the LLM agent explicitly marked the last action as terminal
-    if get_event_value(last_event, "is_terminal") is True:
-        return True
-
     last_action = get_event_value(last_event, "action")
     if not last_action:
         return False
+
+    # If we are in BPMN mode and have a transitions map
+    if transitions is not None:
+        last_action_lower = last_action.lower()
+        
+        # Find matching key in transitions (case-insensitive)
+        matched_key = None
+        for k in transitions.keys():
+            if k.lower() == last_action_lower:
+                matched_key = k
+                break
+        
+        if matched_key is not None:
+            allowed_next = transitions[matched_key]
+            # The process is finished if the only next action is "END" or "end" (or it is in allowed_next)
+            if "END" in allowed_next or "end" in allowed_next:
+                return True
+            # If the allowed_next list is empty (e.g. no outgoing flow from this task in BPMN)
+            if not allowed_next:
+                return True
+            # Otherwise, since there are further steps in the BPMN, the process is NOT finished,
+            # even if the agent returned is_terminal=True
+            return False
+
+    # Fallback/LLM-based mode logic:
+
+    # 1. Check if the LLM agent explicitly marked the last action as terminal
+    if get_event_value(last_event, "is_terminal") is True:
+        return True
 
     last_action_lower = last_action.lower()
 

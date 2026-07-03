@@ -13,6 +13,7 @@ const createInitialConfig = () => ({
     mode: 'BPMN_BASED',
     description: '',
     bpmnFile: null,
+    runName: '',
   },
   agents: [],
   attributes: createEssentialAttributes(),
@@ -162,6 +163,15 @@ export const useConfigState = () => {
     [update]
   );
 
+  const setRunName = useCallback(
+    (runName) =>
+      update((c) => ({
+        ...c,
+        process: { ...c.process, runName },
+      })),
+    [update]
+  );
+
 
   const resetStep = useCallback(
     (stepName) => {
@@ -200,6 +210,7 @@ export const useConfigState = () => {
     updateAttribute,
     removeAttribute,
     setCaseCount,
+    setRunName,
     resetStep,
     resetAll,
   };

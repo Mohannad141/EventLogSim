@@ -38,6 +38,8 @@ const stepReason = (step) => {
 };
 
 const deriveConfigName = (config) => {
+  const name = (config?.process?.runName || '').trim();
+  if (name) return name;
   const desc = (config?.process?.description || '').trim();
   if (desc) return desc.length > 30 ? `${desc.slice(0, 30)}…` : desc;
   return 'Untitled run';
@@ -56,6 +58,7 @@ const ConfigurationPage = () => {
     updateAttribute,
     removeAttribute,
     setCaseCount,
+    setRunName,
     resetStep,
     resetAll,
   } = useConfigState();
@@ -137,6 +140,7 @@ const ConfigurationPage = () => {
             onChangeMode={setProcessMode}
             onChangeDescription={setProcessDescription}
             onChangeBpmnFile={setBpmnFile}
+            onChangeRunName={setRunName}
             onResetStep={() => resetStep('process')}
           />
         );

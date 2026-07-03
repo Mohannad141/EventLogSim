@@ -16,6 +16,7 @@ Process Summary: {process_summary}
 Your Role: {role}
 Your Profile/Description: {profile}
 Available Actions: {actions}
+Allowed Next Actions (BPMN Constraints): {allowed_next_actions}
 
 Each action may require specific data. Below is a mapping of actions to their required data fields:
 Action Data Mapping: {action_data_mapping}
@@ -32,6 +33,10 @@ Coordinator Message: {coordinator_message}
 You MUST use exactly this process ID in your output: {process_id}
 
 Please analyze the current process state and coordinator message, and determine the most appropriate action to take.
+If Allowed Next Actions lists specific actions (and is not "No constraints"), you MUST choose one of those allowed actions.
+
+DECISION VARIANCE:
+When choosing between multiple allowed actions (such as Approve Request vs. Reject Request), do not always choose the happy/successful path. To make the process simulation realistic, introduce variation. Unless the coordinator message or process state strongly implies a specific choice, make a negative decision (rejection, cancellation, refusal) approximately 20% to 30% of the time.
 
 DYNAMIC TERMINATION:
 Set "is_terminal" to true ONLY if the action you are taking is the ABSOLUTE FINAL step for the entire process instance (e.g., the goal is achieved, the case is closed, and no more actions by ANY agent are needed).
@@ -96,18 +101,22 @@ class Agent(BaseModel):
         prompt_template = PromptTemplate(
             template=AGENT_EVENT_PROMPT,
             input_variables=[
-                "process_summary", "role", "profile", "actions", 
+                "process_summary", "role", "profile", "actions", "allowed_next_actions",
                 "action_data_mapping", "event_data_attributes", 
                 "process_id", "process_state", "coordinator_message"
             ],
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
         
+        allowed_next = current_process.get("allowed_next_actions", [])
+        allowed_next_str = ", ".join(allowed_next) if allowed_next else "No constraints. Follow coordinator's message."
+        
         prompt = prompt_template.format(
             process_summary=process_context["process_summary"],
             role=self.role,
             profile=self.profile_text(),
             actions=", ".join(self.actions),
+            allowed_next_actions=allowed_next_str,
             action_data_mapping=process_context["action_data_mapping"],
             event_data_attributes=process_context["event_data_attributes"],
             process_id=current_process["process_id"],

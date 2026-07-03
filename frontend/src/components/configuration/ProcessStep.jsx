@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Upload, FileText, X, RotateCcw } from 'lucide-react';
 import Textarea from '../primitives/Textarea.jsx';
 import Button from '../primitives/Button.jsx';
+import Input from '../primitives/Input.jsx';
 import ConfirmDialog from '../common/ConfirmDialog.jsx';
 import { cn } from '../../utils/cn.js';
 import { formatNumber } from '../../utils/format.js';
@@ -29,6 +30,7 @@ const ProcessStep = ({
   onChangeMode,
   onChangeDescription,
   onChangeBpmnFile,
+  onChangeRunName,
   onResetStep,
 }) => {
   const fileInputRef = useRef(null);
@@ -87,6 +89,25 @@ const ProcessStep = ({
           <RotateCcw className="mr-1 h-3.5 w-3.5" />
           Reset step
         </Button>
+      </div>
+
+      <div>
+        <label
+          htmlFor="run-name"
+          className="block text-sm font-medium text-gray-900"
+        >
+          Run Name <span className="text-red-600">*</span>
+        </label>
+        <Input
+          id="run-name"
+          value={process.runName || ''}
+          onChange={(e) => onChangeRunName(e.target.value)}
+          placeholder="e.g. IT process, Payment process, or test 101"
+          className="mt-1"
+        />
+        {errors.runName && (
+          <p className="mt-1 text-xs text-red-600">{errors.runName}</p>
+        )}
       </div>
 
       <fieldset>

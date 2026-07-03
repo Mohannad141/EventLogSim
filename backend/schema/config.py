@@ -5,6 +5,7 @@ class ProcessConfig(BaseModel):
     mode: str  # "BPMN_BASED" or "LLM_BASED"
     description: str
     bpmnFile: Optional[dict] = None 
+    runName: Optional[str] = None
 
 class AgentConfig(BaseModel):
     id: str
