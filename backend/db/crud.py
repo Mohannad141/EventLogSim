@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Helper to serialize JSON attributes if they are not already strings/dicts
@@ -193,4 +193,14 @@ async def save_completed_run(
         await db.execute(event_insert_query, event_records)
 
 
+    await db.commit()
+
+async def delete_runs(db: AsyncSession, run_ids: List[str]):
+    """Delete multiple runs by their IDs. Cascade will delete associated events."""
+    if not run_ids:
+        return
+    query = text("DELETE FROM runs WHERE id IN :run_ids").bindparams(
+        bindparam("run_ids", expanding=True)
+    )
+    await db.execute(query, {"run_ids": list(run_ids)})
     await db.commit()

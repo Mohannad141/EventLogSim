@@ -9,6 +9,7 @@ import SelectionToolbar from '../components/runs/SelectionToolbar.jsx';
 import ComparePanel from '../components/runs/ComparePanel.jsx';
 import { useRuns } from '../hooks/useRuns.jsx';
 import ConfirmDialog from '../components/common/ConfirmDialog.jsx';
+import { deleteRuns } from '../lib/api.js';
 
 const MAX_SELECTION = 4;
 
@@ -108,19 +109,12 @@ const averageEventsPerCase =
   confirmLabel="Delete"
   variant="danger"
   onConfirm={async () => {
-  try {
-    await fetch('http://127.0.0.1:8000/api/runs', {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(Array.from(selectedIds)),
-    });
-
-    await refresh();
-    clearSelection();
-    setConfirmDeleteRuns(false);
-  } catch (error) {
+    try {
+      await deleteRuns(Array.from(selectedIds));
+      await refresh();
+      clearSelection();
+      setConfirmDeleteRuns(false);
+    } catch (error) {
     console.error('Failed to delete runs:', error);
   }
 }}

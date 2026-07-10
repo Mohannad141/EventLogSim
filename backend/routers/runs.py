@@ -229,3 +229,15 @@ async def get_run_detail(run_id: str, db: AsyncSession = Depends(get_db)):
         updated_run = await crud.get_run_by_id(db, run_id)
         return with_snapshot_alias(updated_run)
 
+
+@router.delete("/runs")
+async def delete_runs_endpoint(run_ids: List[str], db: AsyncSession = Depends(get_db)):
+    try:
+        await crud.delete_runs(db, run_ids)
+        return {"message": f"Successfully deleted {len(run_ids)} runs."}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete runs: {e}"
+        )
+

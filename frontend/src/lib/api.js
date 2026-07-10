@@ -85,3 +85,13 @@ export const sendChatMessage = async (messages) => {
     body: JSON.stringify({ messages }),
   });
 };
+
+export const deleteRuns = async (ids) => {
+  return request('/api/runs', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(ids),
+  });
+};
