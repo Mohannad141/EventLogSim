@@ -31,10 +31,29 @@ def format_event_data_attributes(event_data_attributes: Any) -> str:
         return "No event data attributes required."
 
     if isinstance(event_data_attributes, list):
-        return ", ".join(
-            format_attribute_requirement(attribute)
-            for attribute in event_data_attributes
-        )
+        items = []
+        for attr in event_data_attributes:
+            if isinstance(attr, dict):
+                name = attr.get("name")
+                attr_type = attr.get("type", "string")
+                locked = attr.get("locked", False)
+                desc = attr.get("description")
+            else:
+                name = getattr(attr, "name", None)
+                attr_type = getattr(attr, "type", "string")
+                locked = getattr(attr, "locked", False)
+                desc = getattr(attr, "description", None)
+            
+            if locked or not name:
+                continue
+            
+            # Default instruction to encourage dynamic context-aware diversity
+            if not desc or not desc.strip():
+                desc = f"Determine a realistic, diverse, and context-dependent value for this '{name}' attribute based on the action you are taking. Do not repeat the same value (like 150) for every event; vary it realistically."
+
+            desc_str = f": {desc}"
+            items.append(f"- {name} ({attr_type}){desc_str}")
+        return "\n".join(items) if items else "No custom event attributes."
 
     return str(event_data_attributes)
 

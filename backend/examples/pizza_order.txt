@@ -1,0 +1,48 @@
+=========================================
+PIZZA ORDER PROCESS - SIMULATION TEMPLATE
+=========================================
+
+-----------------------------
+1. PROCESS DESCRIPTION
+-----------------------------
+A pizza store order fulfillment process. It starts when a customer places an order.
+First, the Clerk receives the order and checks the order (e.g. validating items or address).
+If the order is not confirmed (canceled), the Clerk cancels the order and it is rejected.
+If the order is confirmed, the Pizza Chef prepares the ingredients, bakes the pizza, and boxes the pizza.
+Next, the Delivery Rider delivers the pizza to the customer.
+Finally, the Clerk collects the payment from the customer and the order is fulfilled.
+
+-----------------------------
+2. AGENTS / ROLES CONFIGURATION
+-----------------------------
+
+* Agent 1: Clerk
+  - Role: Clerk
+  - Description: Handles customer relations, order intake, order verification, cancellations, payment processing, and final delivery confirmations.
+  - Actions: Receive Order, Check Order, Cancel Order, Collect Payment
+
+* Agent 2: Pizza Chef
+  - Role: Pizza Chef
+  - Description: Prepares the pizza base and toppings, bakes the pizza in the wood-fired oven, and packs it into the delivery box.
+  - Actions: Prepare Ingredients, Bake Pizza, Box Pizza
+
+* Agent 3: Delivery Rider
+  - Role: Delivery Rider
+  - Description: Transports hot pizza boxes to customers' addresses and confirms hand-off.
+  - Actions: Deliver Pizza
+
+-----------------------------
+3. CASE ATTRIBUTES CONFIGURATION
+-----------------------------
+
+* Attribute 1: cost
+  - Type: number
+  - Value Generation Instructions: A random decimal value representing order cost, between 8.50 and 45.00.
+
+* Attribute 2: pizza_type
+  - Type: string
+  - Value Generation Instructions: One of the following: Margherita, Pepperoni, Veggie, BBQ Chicken, Quattro Formaggi.
+
+* Attribute 3: rating
+  - Type: number
+  - Value Generation Instructions: A random integer customer satisfaction rating between 1 and 5.

@@ -38,6 +38,9 @@ If Allowed Next Actions lists specific actions (and is not "No constraints"), yo
 DECISION VARIANCE:
 When choosing between multiple allowed actions (such as Approve Request vs. Reject Request), do not always choose the happy/successful path. To make the process simulation realistic, introduce variation. Unless the coordinator message or process state strongly implies a specific choice, make a negative decision (rejection, cancellation, refusal) approximately 20% to 30% of the time.
 
+ATTRIBUTE DIVERSITY:
+When providing values for custom event data attributes (like cost, complexity, etc.), do not use the same hardcoded value for every event. Determine a realistic, diverse, and context-dependent value based on the specific action you are taking (e.g. labor cost vs. hardware parts cost). Vary the values realistically across different steps of the process instance.
+
 DYNAMIC TERMINATION:
 Set "is_terminal" to true ONLY if the action you are taking is the ABSOLUTE FINAL step for the entire process instance (e.g., the goal is achieved, the case is closed, and no more actions by ANY agent are needed).
 If the process needs to be handed over to another role or another step is required, you MUST set "is_terminal" to false.

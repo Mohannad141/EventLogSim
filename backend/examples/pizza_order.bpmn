@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  id="Definitions_Pizza"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="Pizza Order Fulfillment" processRef="Process_Pizza" />
+  </bpmn:collaboration>
+
+  <bpmn:process id="Process_Pizza" name="Pizza Order Process" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_Clerk" name="Clerk">
+        <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReceiveOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CheckOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Confirmed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CancelOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CollectPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Rejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Fulfilled</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Chef" name="Pizza Chef">
+        <bpmn:flowNodeRef>Task_PrepareIngredients</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BakePizza</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BoxPizza</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Rider" name="Delivery Rider">
+        <bpmn:flowNodeRef>Task_DeliverPizza</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+
+    <bpmn:startEvent id="StartEvent_1" name="Order Received">
+      <bpmn:outgoing>Flow_Start_Receive</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:task id="Task_ReceiveOrder" name="Receive Order">
+      <bpmn:incoming>Flow_Start_Receive</bpmn:incoming>
+      <bpmn:outgoing>Flow_Receive_Check</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_CheckOrder" name="Check Order">
+      <bpmn:incoming>Flow_Receive_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_Check_Gateway</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:exclusiveGateway id="Gateway_Confirmed" name="Order Confirmed?">
+      <bpmn:incoming>Flow_Check_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Gateway_Prepare</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Gateway_Cancel</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:task id="Task_CancelOrder" name="Cancel Order">
+      <bpmn:incoming>Flow_Gateway_Cancel</bpmn:incoming>
+      <bpmn:outgoing>Flow_Cancel_Reject</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:endEvent id="EndEvent_Rejected" name="Order Rejected">
+      <bpmn:incoming>Flow_Cancel_Reject</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:task id="Task_PrepareIngredients" name="Prepare Ingredients">
+      <bpmn:incoming>Flow_Gateway_Prepare</bpmn:incoming>
+      <bpmn:outgoing>Flow_Prepare_Bake</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_BakePizza" name="Bake Pizza">
+      <bpmn:incoming>Flow_Prepare_Bake</bpmn:incoming>
+      <bpmn:outgoing>Flow_Bake_Box</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_BoxPizza" name="Box Pizza">
+      <bpmn:incoming>Flow_Bake_Box</bpmn:incoming>
+      <bpmn:outgoing>Flow_Box_Deliver</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_DeliverPizza" name="Deliver Pizza">
+      <bpmn:incoming>Flow_Box_Deliver</bpmn:incoming>
+      <bpmn:outgoing>Flow_Deliver_Collect</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_CollectPayment" name="Collect Payment">
+      <bpmn:incoming>Flow_Deliver_Collect</bpmn:incoming>
+      <bpmn:outgoing>Flow_Collect_End</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:endEvent id="EndEvent_Fulfilled" name="Order Fulfilled">
+      <bpmn:incoming>Flow_Collect_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Start_Receive" sourceRef="StartEvent_1" targetRef="Task_ReceiveOrder" />
+    <bpmn:sequenceFlow id="Flow_Receive_Check" sourceRef="Task_ReceiveOrder" targetRef="Task_CheckOrder" />
+    <bpmn:sequenceFlow id="Flow_Check_Gateway" sourceRef="Task_CheckOrder" targetRef="Gateway_Confirmed" />
+    <bpmn:sequenceFlow id="Flow_Gateway_Prepare" name="yes" sourceRef="Gateway_Confirmed" targetRef="Task_PrepareIngredients" />
+    <bpmn:sequenceFlow id="Flow_Gateway_Cancel" name="no" sourceRef="Gateway_Confirmed" targetRef="Task_CancelOrder" />
+    <bpmn:sequenceFlow id="Flow_Cancel_Reject" sourceRef="Task_CancelOrder" targetRef="EndEvent_Rejected" />
+    <bpmn:sequenceFlow id="Flow_Prepare_Bake" sourceRef="Task_PrepareIngredients" targetRef="Task_BakePizza" />
+    <bpmn:sequenceFlow id="Flow_Bake_Box" sourceRef="Task_BakePizza" targetRef="Task_BoxPizza" />
+    <bpmn:sequenceFlow id="Flow_Box_Deliver" sourceRef="Task_BoxPizza" targetRef="Task_DeliverPizza" />
+    <bpmn:sequenceFlow id="Flow_Deliver_Collect" sourceRef="Task_DeliverPizza" targetRef="Task_CollectPayment" />
+    <bpmn:sequenceFlow id="Flow_Collect_End" sourceRef="Task_CollectPayment" targetRef="EndEvent_Fulfilled" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_1_di" bpmnElement="Participant_1" isHorizontal="true">
+        <dc:Bounds x="120" y="50" width="1010" height="490" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Clerk_di" bpmnElement="Lane_Clerk" isHorizontal="true">
+        <dc:Bounds x="150" y="50" width="980" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Chef_di" bpmnElement="Lane_Chef" isHorizontal="true">
+        <dc:Bounds x="150" y="200" width="980" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Rider_di" bpmnElement="Lane_Rider" isHorizontal="true">
+        <dc:Bounds x="150" y="360" width="980" height="180" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="180" y="100" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="160" y="143" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReceiveOrder_di" bpmnElement="Task_ReceiveOrder">
+        <dc:Bounds x="240" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckOrder_di" bpmnElement="Task_CheckOrder">
+        <dc:Bounds x="360" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Confirmed_di" bpmnElement="Gateway_Confirmed" isMarkerVisible="true">
+        <dc:Bounds x="485" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="466" y="152" width="89" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CancelOrder_di" bpmnElement="Task_CancelOrder">
+        <dc:Bounds x="580" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Rejected_di" bpmnElement="EndEvent_Rejected">
+        <dc:Bounds x="720" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="702" y="145" width="73" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PrepareIngredients_di" bpmnElement="Task_PrepareIngredients">
+        <dc:Bounds x="580" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_BakePizza_di" bpmnElement="Task_BakePizza">
+        <dc:Bounds x="700" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_BoxPizza_di" bpmnElement="Task_BoxPizza">
+        <dc:Bounds x="820" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DeliverPizza_di" bpmnElement="Task_DeliverPizza">
+        <dc:Bounds x="820" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CollectPayment_di" bpmnElement="Task_CollectPayment">
+        <dc:Bounds x="940" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Fulfilled_di" bpmnElement="EndEvent_Fulfilled">
+        <dc:Bounds x="1070" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1053" y="145" width="71" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_Receive_di" bpmnElement="Flow_Start_Receive">
+        <di:waypoint x="216" y="118" />
+        <di:waypoint x="240" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Receive_Check_di" bpmnElement="Flow_Receive_Check">
+        <di:waypoint x="340" y="120" />
+        <di:waypoint x="360" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Check_Gateway_di" bpmnElement="Flow_Check_Gateway">
+        <di:waypoint x="460" y="120" />
+        <di:waypoint x="485" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Gateway_Cancel_di" bpmnElement="Flow_Gateway_Cancel">
+        <di:waypoint x="535" y="120" />
+        <di:waypoint x="580" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="551" y="102" width="13" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Cancel_Reject_di" bpmnElement="Flow_Cancel_Reject">
+        <di:waypoint x="680" y="120" />
+        <di:waypoint x="720" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Gateway_Prepare_di" bpmnElement="Flow_Gateway_Prepare">
+        <di:waypoint x="510" y="145" />
+        <di:waypoint x="510" y="280" />
+        <di:waypoint x="580" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="516" y="210" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Prepare_Bake_di" bpmnElement="Flow_Prepare_Bake">
+        <di:waypoint x="680" y="280" />
+        <di:waypoint x="700" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Bake_Box_di" bpmnElement="Flow_Bake_Box">
+        <di:waypoint x="800" y="280" />
+        <di:waypoint x="820" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Box_Deliver_di" bpmnElement="Flow_Box_Deliver">
+        <di:waypoint x="870" y="320" />
+        <di:waypoint x="870" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Deliver_Collect_di" bpmnElement="Flow_Deliver_Collect">
+        <di:waypoint x="920" y="450" />
+        <di:waypoint x="990" y="450" />
+        <di:waypoint x="990" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Collect_End_di" bpmnElement="Flow_Collect_End">
+        <di:waypoint x="1040" y="120" />
+        <di:waypoint x="1070" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

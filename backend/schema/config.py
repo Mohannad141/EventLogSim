@@ -19,6 +19,7 @@ class AttributeConfig(BaseModel):
     id: str
     name: str
     type: str  # "string", "number", "datetime"
+    description: Optional[str] = None
     locked: bool = False
 
 class SimulationConfig(BaseModel):

@@ -123,7 +123,7 @@ def generate_event_log(
         "process": {
             "summary": config.process.description,
             "action_data_mapping": "No specific mapping provided.", 
-            "event_data_attributes": ", ".join([attr.name for attr in config.attributes if not attr.locked])
+            "event_data_attributes": [attr.model_dump() for attr in config.attributes]
         }
     }
 
