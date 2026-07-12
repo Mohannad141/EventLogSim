@@ -5,6 +5,7 @@ import uvicorn
 
 from routers.runs import router as runs_router
 from routers.chat import router as chat_router
+from routers.evaluations import router as evaluations_router
 from db.session import init_db
 
 @asynccontextmanager
@@ -17,6 +18,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(runs_router, prefix="/api", tags=["runs"])
 app.include_router(chat_router, prefix="/api", tags=["chat"])
+app.include_router(evaluations_router, prefix="/api", tags=["evaluations"])
 
 def main():
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

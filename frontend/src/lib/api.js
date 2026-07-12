@@ -95,3 +95,26 @@ export const deleteRuns = async (ids) => {
     body: JSON.stringify(ids),
   });
 };
+
+export const runEvaluation = async (runId, { ruleWeight = 0.5, llmWeight = 0.5 } = {}) => {
+  return request('/api/evaluations/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ run_id: runId, rule_weight: ruleWeight, llm_weight: llmWeight }),
+  });
+};
+
+export const getCaseEvaluations = async (runId) => {
+  const data = await request(`/api/evaluations/cases?run_id=${encodeURIComponent(runId)}`);
+  return Array.isArray(data?.evaluations) ? data.evaluations : [];
+};
+
+export const getAgentScores = async (runId) => {
+  const data = await request(`/api/evaluations/agents?run_id=${encodeURIComponent(runId)}`);
+  return Array.isArray(data?.agents) ? data.agents : [];
+};
+
+export const getAttributeScores = async (runId) => {
+  const data = await request(`/api/evaluations/attributes?run_id=${encodeURIComponent(runId)}`);
+  return Array.isArray(data?.attributes) ? data.attributes : [];
+};
