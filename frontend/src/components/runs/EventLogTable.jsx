@@ -60,6 +60,7 @@ const EventLogTable = ({
                 'Timestamp',
                 'Resource',
                 'Role',
+                'Feedback',
                 ...customColumns,
               ].map((label) => (
                 <th
@@ -89,6 +90,9 @@ const EventLogTable = ({
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-gray-700">
                   {formatCell(ev.role)}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-gray-700 font-medium text-indigo-600">
+                  {formatCell(ev.feedback)}
                 </td>
                 {customColumns.map((col) => (
                   <td

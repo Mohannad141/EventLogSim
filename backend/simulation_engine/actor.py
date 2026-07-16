@@ -39,7 +39,12 @@ DECISION VARIANCE:
 When choosing between multiple allowed actions (such as Approve Request vs. Reject Request), do not always choose the happy/successful path. To make the process simulation realistic, introduce variation. Unless the coordinator message or process state strongly implies a specific choice, make a negative decision (rejection, cancellation, refusal) approximately 20% to 30% of the time.
 
 ATTRIBUTE DIVERSITY:
-When providing values for custom event data attributes (like cost, complexity, etc.), do not use the same hardcoded value for every event. Determine a realistic, diverse, and context-dependent value based on the specific action you are taking (e.g. labor cost vs. hardware parts cost). Vary the values realistically across different steps of the process instance.
+When providing values for custom event data attributes (e.g., costs, categories, ratings):
+- Do not use the same hardcoded value for every process instance. You MUST determine a realistic, diverse, and context-dependent value for each attribute based on its name and description.
+- For categorical attributes (attributes with a list of allowed options in their description), you MUST randomly distribute your choices across different cases. Do NOT repeatedly select the same option (vary your selections randomly among all available options).
+- For numeric attributes, you MUST randomly vary the values across different cases within the allowed range described.
+- Align any satisfaction rating attribute with the score in your feedback (e.g., if feedback is 5/5, a rating attribute should be 5; if feedback is 3/5, a rating attribute should be 3).
+- Vary values realistically across different steps and cases of the process.
 
 DYNAMIC TERMINATION:
 Set "is_terminal" to true ONLY if the action you are taking is the ABSOLUTE FINAL step for the entire process instance (e.g., the goal is achieved, the case is closed, and no more actions by ANY agent are needed).
@@ -61,6 +66,7 @@ class GeneratedEvent(BaseModel):
     start_timestamp: str = Field(..., description="The timestamp when the action started")
     end_timestamp: str = Field(..., description="The timestamp when the action ended")
     is_terminal: bool = Field(default=False, description="Set to true if this action completes the entire process instance.")
+    feedback: str = Field(..., description="Agent's subjective satisfaction feedback for taking this action. You MUST strictly start with a score out of 5 followed by a hyphen and a brief comment (e.g. '5/5 - Order checked successfully', '3/5 - Prep took longer than expected'). The score prefix (e.g. 'X/5 - ') is MANDATORY. Do NOT always choose '5/5'; vary the satisfaction score realistically between 1/5 and 5/5 based on event outcomes, cancellations, minor issues, or human factors.")
     case_data: Optional[List[EventAttribute]] = Field(default=None, description="A list of case data attributes relevant to the specific action")
     event_data: Optional[List[EventAttribute]] = Field(default=None, description="A list of event data attributes relevant to all actions")
 
@@ -69,6 +75,7 @@ class GeneratedEvent(BaseModel):
 class Agent(BaseModel):
     id: str
     role: str
+    name: Optional[str] = None
     description: str = ""
     age: Optional[int] = None
     actions: List[str]
@@ -78,6 +85,7 @@ class Agent(BaseModel):
         return cls(
             id=data["id"],
             role=data["role"],
+            name=data.get("name"),
             description=data.get("description", ""),
             age=data.get("age"),
             actions=data["actions"],
@@ -114,10 +122,24 @@ class Agent(BaseModel):
         allowed_next = current_process.get("allowed_next_actions", [])
         allowed_next_str = ", ".join(allowed_next) if allowed_next else "No constraints. Follow coordinator's message."
         
+        # Select a random mood to introduce human-like feedback and satisfaction score variation
+        import random
+        moods = [
+            "Energetic and highly satisfied (satisfaction score target: 5/5)",
+            "Calm and content (satisfaction score target: 4/5)",
+            "Productive but slightly busy (satisfaction score target: 4/5)",
+            "Tired after a long shift (satisfaction score target: 3/5)",
+            "Slightly frustrated by minor tool delays (satisfaction score target: 2/5)",
+            "Distracted by other incoming tasks (satisfaction score target: 3/5)",
+            "Happy and helpful (satisfaction score target: 5/5)"
+        ]
+        current_mood = random.choice(moods)
+        profile_str = self.profile_text() + f" Current Mood: {current_mood}."
+
         prompt = prompt_template.format(
             process_summary=process_context["process_summary"],
             role=self.role,
-            profile=self.profile_text(),
+            profile=profile_str,
             actions=", ".join(self.actions),
             allowed_next_actions=allowed_next_str,
             action_data_mapping=process_context["action_data_mapping"],
@@ -128,7 +150,9 @@ class Agent(BaseModel):
         )
         
         # Standard invoke (no with_structured_output)
-        response = llm.invoke(prompt)
+        import random
+        llm_bound = llm.bind(seed=random.randint(1, 100000), temperature=0.8)
+        response = llm_bound.invoke(prompt)
         
         try:
             parsed_data = parser.parse(response.content)

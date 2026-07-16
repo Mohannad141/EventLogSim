@@ -65,7 +65,7 @@ async def get_run_by_id(db: AsyncSession, run_id: str) -> Optional[Dict[str, Any
 
     # 2. Fetch associated events
     events_query = text("""
-        SELECT case_id, activity, timestamp, attributes, is_terminal, resource, role 
+        SELECT case_id, activity, timestamp, attributes, is_terminal, resource, role, feedback 
         FROM events 
         WHERE run_id = :run_id 
         ORDER BY id ASC
@@ -80,6 +80,7 @@ async def get_run_by_id(db: AsyncSession, run_id: str) -> Optional[Dict[str, Any
             "is_terminal": row["is_terminal"],
             "resource": row["resource"],
             "role": row["role"],
+            "feedback": row["feedback"],
             "attributes": _serialize_json(row["attributes"])
         })
 
@@ -163,8 +164,8 @@ async def save_completed_run(
     # 2. Insert all events using bulk execution
     if events:
         event_insert_query = text("""
-            INSERT INTO events (run_id, case_id, activity, timestamp, is_terminal, resource, role, attributes) 
-            VALUES (:run_id, :case_id, :activity, :timestamp, :is_terminal, :resource, :role, :attributes)
+            INSERT INTO events (run_id, case_id, activity, timestamp, is_terminal, resource, role, feedback, attributes) 
+            VALUES (:run_id, :case_id, :activity, :timestamp, :is_terminal, :resource, :role, :feedback, :attributes)
         """)
         
         event_records = []
@@ -187,6 +188,7 @@ async def save_completed_run(
                 "is_terminal": ev.get("is_terminal", False),
                 "resource": ev.get("resource"),
                 "role": ev.get("role"),
+                "feedback": ev.get("feedback"),
                 "attributes": json.dumps(ev.get("attributes") or {})
             })
             

@@ -45,6 +45,9 @@ INSTRUCTIONS:
 3. Choose an agent whose role makes sense for the NEXT step in the process goal.
 4. If a hand-off is needed (e.g., from an 'Initial Phase' role to a 'Specialist' role), pick the new role now.
 
+DECISION VARIANCE (BRANCHING):
+When a process instance has multiple allowed next actions that branch the process (such as a choice between continuing the happy path e.g. "Prepare Ingredients", or aborting/rejecting e.g. "Cancel Order"), do not always choose the happy path. Approximately 20% to 30% of the time, choose the alternative/rejection path by assigning the agent capable of that action.
+
 Write a short message to the selected agent explaining what they should do next.
 
 {format_instructions}
@@ -89,7 +92,9 @@ class Coordinator(BaseModel):
         )
 
         # Standard invoke (no with_structured_output)
-        response = llm.invoke(prompt)
+        import random
+        llm_bound = llm.bind(seed=random.randint(1, 100000), temperature=0.8)
+        response = llm_bound.invoke(prompt)
         
         try:
             # Parse the string response into our Pydantic model

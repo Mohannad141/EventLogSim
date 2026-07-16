@@ -109,9 +109,17 @@ def get_current_process(process_id: str, events: List[Any]) -> Dict[str, Any]:
     business_events = get_business_events(process_events)
     case_data = collect_case_data(process_events)
 
+    state_desc = describe_process_state(business_events, case_data)
+    
+    import random
+    # Generate a dynamic random token to break prompt symmetry
+    seed_val = random.randint(100000, 999999)
+    # Append unique case variation guidelines directly to the state description
+    state_desc += f"\n[Unique Case Token: {seed_val}] You MUST generate unique customer preferences, costs, types, and rating attributes specific to this case instance. Do not repeat the exact same values across different case IDs."
+
     return {
         "process_id": process_id,
-        "process_state": describe_process_state(business_events, case_data),
+        "process_state": state_desc,
         "case_data": case_data,
         "previous_events": process_events,
     }

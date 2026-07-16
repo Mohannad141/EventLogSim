@@ -61,6 +61,7 @@ async def init_db():
                     is_terminal BOOLEAN DEFAULT FALSE,
                     resource VARCHAR(100),
                     role VARCHAR(100),
+                    feedback TEXT,
                     attributes JSONB,
                     FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
                 );
@@ -75,6 +76,9 @@ async def init_db():
             """))
             await session.execute(text("""
                 ALTER TABLE events ADD COLUMN IF NOT EXISTS role VARCHAR(100);
+            """))
+            await session.execute(text("""
+                ALTER TABLE events ADD COLUMN IF NOT EXISTS feedback TEXT;
             """))
             
             # Create index for faster querying of events by run_id

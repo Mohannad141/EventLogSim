@@ -107,6 +107,7 @@ def generate_event_log(
                     agents.append(Agent(
                         id=role_id,
                         role=clean_role,
+                        name=clean_role,
                         description=f"Automated agent simulating the role of {clean_role}.",
                         actions=actions,
                         age=None
@@ -274,8 +275,9 @@ def generate_event_log(
                 "activity": ev["action"],
                 "timestamp": ev.get("timestamp", datetime.now().isoformat()),
                 "is_terminal": ev.get("is_terminal", False),
-                "resource": agent_obj.id if agent_obj else "Unknown",
+                "resource": agent_obj.name if (agent_obj and agent_obj.name) else (agent_obj.id if agent_obj else "Unknown"),
                 "role": agent_obj.role if agent_obj else "Unknown",
+                "feedback": ev.get("feedback", ""),
                 "attributes": combined_attributes
             })
 
