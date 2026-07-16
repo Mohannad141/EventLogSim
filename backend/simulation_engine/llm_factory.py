@@ -5,7 +5,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 load_dotenv()
 
-def get_llm(temperature: float = 0.7):
+def get_llm():
     #Factory function to get the LLM based on environment variables.
 
     # 1. FAU HPC (OwlChat) - Default
@@ -15,45 +15,51 @@ def get_llm(temperature: float = 0.7):
             model=os.getenv("HPC_MODEL_NAME", "gpt-oss-120b"),
             openai_api_key=hpc_key,
             openai_api_base="https://hub.nhr.fau.de/api/llmgw/v1",
-            temperature=temperature
+            temperature=0.7
         )
-
+    
     # 2. DeepSeek
     ds_key = os.getenv("DS_API_KEY")
     if ds_key:
         return ChatOpenAI(
             model="deepseek-chat",
             openai_api_key=ds_key,
-            openai_api_base="https://api.deepseek.com",
-            temperature=temperature
+            openai_api_base="https://api.deepseek.com"
         )
-
+    
     # 3. OpenAI
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
         return ChatOpenAI(
             model="gpt-4o",
-            openai_api_key=openai_key,
-            temperature=temperature
+            openai_api_key=openai_key
         )
-
+    
     # 4. Google Gemini
     gemini_key = os.getenv("GOOGLE_API_KEY")
     if gemini_key:
         return ChatGoogleGenerativeAI(
             model="gemini-1.5-pro",
-            google_api_key=gemini_key,
-            temperature=temperature
+            google_api_key=gemini_key
         )
-
+    
     # 5. GROQ
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         return ChatOpenAI(
             model="llama-3.3-70b-versatile",
-            openai_api_key=groq_key,
-            openai_api_base="https://api.groq.com/openai/v1",
-            temperature=temperature
+        openai_api_key=groq_key,
+        openai_api_base="https://api.groq.com/openai/v1"
+        )
+    
+    # 5. HPC (Used if key is present)
+    hpc_key = os.getenv("HPC_API_KEY")
+    if hpc_key:
+        return ChatOpenAI(
+            model=os.getenv("HPC_MODEL_NAME", "gpt-oss-120b"),
+            openai_api_key=hpc_key,
+            openai_api_base="https://hub.nhr.fau.de/api/llmgw/v1",
+            temperature=0.7
         )
 
     # Fallback or Error

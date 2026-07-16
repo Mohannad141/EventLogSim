@@ -13,7 +13,6 @@ import EventDistributionChart from '../components/runs/EventDistributionChart.js
 import AttributeDistributionChart from '../components/runs/AttributeDistributionChart.jsx';
 import TraceVariantsList from '../components/runs/TraceVariantsList.jsx';
 import EventLogTable from '../components/runs/EventLogTable.jsx';
-import EvaluationPanel from '../components/runs/EvaluationPanel.jsx';
 import { useRunDetail } from '../hooks/useRunDetail.js';
 import { formatRelativeTime } from '../utils/format.js';
 
@@ -142,12 +141,6 @@ const RunDetailPage = () => {
               configSnapshot={run.configSnapshot}
             />
           </Card>
-
-          {run.status === 'completed' && (
-            <Card>
-              <EvaluationPanel runId={run.id} events={run.events || []} />
-            </Card>
-          )}
         </>
       )}
     </div>

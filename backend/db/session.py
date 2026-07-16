@@ -82,26 +82,5 @@ async def init_db():
                 CREATE INDEX IF NOT EXISTS idx_events_run_id ON events(run_id);
             """))
 
-            # Create case_evaluations table
-            await session.execute(text("""
-                CREATE TABLE IF NOT EXISTS case_evaluations (
-                    id SERIAL PRIMARY KEY,
-                    run_id VARCHAR(36) NOT NULL,
-                    case_id VARCHAR(100) NOT NULL,
-                    overall_score FLOAT NOT NULL,
-                    rule_scores JSONB NOT NULL,
-                    llm_score FLOAT,
-                    llm_attribute_scores JSONB,
-                    justification TEXT,
-                    final_score FLOAT NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
-                    UNIQUE (run_id, case_id)
-                );
-            """))
-
-            await session.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_case_evaluations_run_id ON case_evaluations(run_id);
-            """))
-
+            
             logger.info("Database tables initialized successfully.")
