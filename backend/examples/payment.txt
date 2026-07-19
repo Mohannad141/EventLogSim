@@ -1,0 +1,48 @@
+=========================================
+PAYMENT PROCESS - SIMULATION TEMPLATE
+=========================================
+
+-----------------------------
+1. PROCESS DESCRIPTION
+-----------------------------
+A corporate payment request process. It starts when an employee submits a payment request.
+First, the Employee requests the payment.
+Next, the Admin checks the request to verify details.
+Then, the Supervisor decides whether to approve or reject the request.
+If the Supervisor approves the request, the Admin handles the payment (processes bank transfer/disbursement) and the payment is completed.
+If the Supervisor rejects the request, the Supervisor rejects the request and the process ends.
+
+-----------------------------
+2. AGENTS / ROLES CONFIGURATION
+-----------------------------
+
+* Agent 1: Employee
+  - Role: Employee
+  - Description: Submits corporate expense, invoice reimbursement, or invoice payment requests.
+  - Actions: Request Payment
+
+* Agent 2: Admin
+  - Role: Admin
+  - Description: Performs initial checks on payment details and processes the final payment execution/disbursement.
+  - Actions: Check Request, Handle Payment
+
+* Agent 3: Supervisor
+  - Role: Supervisor
+  - Description: Reviews request details to authorize or decline payment requests based on organizational policy and budget.
+  - Actions: Approve Request, Reject Request
+
+-----------------------------
+3. CASE ATTRIBUTES CONFIGURATION
+-----------------------------
+
+* Attribute 1: amount
+  - Type: number
+  - Value Generation Instructions: A random decimal value representing the payment amount, between 5.00 and 2500.00.
+
+* Attribute 2: category
+  - Type: string
+  - Value Generation Instructions: One of the following: Travel, Office Supplies, Software License, Hardware, Marketing.
+
+* Attribute 3: urgency
+  - Type: string
+  - Value Generation Instructions: One of the following: Low, Medium, High.
