@@ -192,10 +192,13 @@ def simulate_single_case(
         # If in BPMN mode, override is_terminal based on the actual BPMN transition
         if transitions is not None:
             next_after_current = get_allowed_next_actions(transitions, ev_data["action"])
-            if "END" in next_after_current or "end" in next_after_current or not next_after_current:
+            non_end = [a for a in next_after_current if a and a.upper() != "END"]
+            if not non_end:
                 ev_data["is_terminal"] = True
-            else:
+            elif len(non_end) == len(next_after_current):
                 ev_data["is_terminal"] = False
+            # else: mixed gateway (END is one of several branches) — keep the
+            # agent's own is_terminal decision so both branches stay reachable
 
         # Calculate event timestamps
         # Each step takes 15-45 minutes

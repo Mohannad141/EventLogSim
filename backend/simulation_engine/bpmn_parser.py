@@ -2,10 +2,42 @@ from lxml import etree
 
 NS = {"bpmn": "http://www.omg.org/spec/BPMN/20100524/MODEL"}
 
+# All BPMN elements that represent an executable activity. Modelers like
+# Camunda/Signavio export specialized task types (userTask, serviceTask, ...)
+# instead of the plain "task" element.
+TASK_TAGS = [
+    "task",
+    "userTask",
+    "serviceTask",
+    "sendTask",
+    "receiveTask",
+    "manualTask",
+    "businessRuleTask",
+    "scriptTask",
+    "callActivity",
+    "subProcess",
+]
+
+# Routing elements we pass through when resolving transitions.
+GATEWAY_TAGS = [
+    "exclusiveGateway",
+    "parallelGateway",
+    "inclusiveGateway",
+    "eventBasedGateway",
+    "complexGateway",
+    "intermediateCatchEvent",
+    "intermediateThrowEvent",
+]
+
+
+def iter_tasks(root):
+    for tag in TASK_TAGS:
+        yield from root.iter(f"{{{NS['bpmn']}}}{tag}")
+
 
 def extract_roles(root) -> dict:
     id_to_name = {}
-    for task in root.iter(f"{{{NS['bpmn']}}}task"):
+    for task in iter_tasks(root):
         id_to_name[task.get("id")] = task.get("name")
 
     roles = {}
@@ -32,10 +64,11 @@ def extract_raw_flow(root) -> dict:
 
 def build_node_info(root) -> dict:
     info = {}
-    for task in root.iter(f"{{{NS['bpmn']}}}task"):
+    for task in iter_tasks(root):
         info[task.get("id")] = {"kind": "task", "name": task.get("name")}
-    for gw in root.iter(f"{{{NS['bpmn']}}}exclusiveGateway"):
-        info[gw.get("id")] = {"kind": "gateway", "name": gw.get("name")}
+    for tag in GATEWAY_TAGS:
+        for gw in root.iter(f"{{{NS['bpmn']}}}{tag}"):
+            info[gw.get("id")] = {"kind": "gateway", "name": gw.get("name")}
     for ev in root.iter(f"{{{NS['bpmn']}}}startEvent"):
         info[ev.get("id")] = {"kind": "start", "name": ev.get("name")}
     for ev in root.iter(f"{{{NS['bpmn']}}}endEvent"):
@@ -43,11 +76,28 @@ def build_node_info(root) -> dict:
     return info
 
 
-def resolve_targets(node_id, raw_flow, node_info) -> list:
-    kind = node_info[node_id]["kind"]
+def resolve_targets(node_id, raw_flow, node_info, _visited=None) -> list:
+    # Guard against gateway loops in the model.
+    if _visited is None:
+        _visited = set()
+    if node_id in _visited:
+        return []
+    _visited.add(node_id)
+
+    node = node_info.get(node_id)
+
+    # Unknown element (boundary event, data object, ...): follow its outgoing
+    # flows transparently instead of crashing.
+    if node is None:
+        results = []
+        for next_id in raw_flow.get(node_id, []):
+            results.extend(resolve_targets(next_id, raw_flow, node_info, _visited))
+        return results
+
+    kind = node["kind"]
 
     if kind == "task":
-        return [node_info[node_id]["name"]]
+        return [node["name"]]
 
     if kind == "end":
         return ["END"]
@@ -55,7 +105,7 @@ def resolve_targets(node_id, raw_flow, node_info) -> list:
     if kind == "gateway":
         results = []
         for next_id in raw_flow.get(node_id, []):
-            results.extend(resolve_targets(next_id, raw_flow, node_info))
+            results.extend(resolve_targets(next_id, raw_flow, node_info, _visited))
         return results
 
     return []

@@ -193,13 +193,15 @@ def is_process_finished(
         
         if matched_key is not None:
             allowed_next = transitions[matched_key]
-            # The process is finished if the only next action is "END" or "end" (or it is in allowed_next)
-            if "END" in allowed_next or "end" in allowed_next:
+            non_end = [a for a in allowed_next if a and a.upper() != "END"]
+            # No outgoing flow, or every branch leads to an end event
+            if not non_end:
                 return True
-            # If the allowed_next list is empty (e.g. no outgoing flow from this task in BPMN)
-            if not allowed_next:
-                return True
-            # Otherwise, since there are further steps in the BPMN, the process is NOT finished,
+            # Mixed gateway: one branch ends the process, others continue.
+            # Respect the agent's decision to take the terminating branch.
+            if len(non_end) < len(allowed_next):
+                return get_event_value(last_event, "is_terminal") is True
+            # Only continuing branches remain: the process is NOT finished,
             # even if the agent returned is_terminal=True
             return False
 
