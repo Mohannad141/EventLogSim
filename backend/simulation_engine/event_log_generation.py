@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
 from simulation_engine.llm_factory import get_llm
@@ -20,6 +21,11 @@ from simulation_engine.process import (
     get_process_context,
     get_unfinished_process_states,
     get_last_action,
+    get_events_for_process,
+    get_business_events,
+    collect_case_data,
+    describe_process_state,
+    is_process_finished,
 )
 
 load_dotenv()
@@ -33,43 +39,180 @@ def build_agents_from_config(agents_data: List[Any]) -> List[Agent]:
         for agent_data in agents_data
     ]
 
-def append_event_to_process(event_log: List[dict], process_id: str, event: dict) -> None:
-    for case in event_log:
-        if case.get("process_id") == process_id:
-            case.setdefault("events", []).append(event)
-            return
 
-    event_log.append({
-        "process_id": process_id,
-        "events": [event],
-    })
+def simulate_single_case(
+    case_id: str,
+    case_index: int,
+    config: Any,
+    agents: List[Agent],
+    transitions: Optional[Dict[str, Any]],
+    terminal_actions: List[str],
+    max_events_per_case: int,
+    coordinator: Coordinator,
+) -> List[dict]:
+    case_events = []
+    wrapper_events = [{"process_id": case_id, "events": case_events}]
+    agents_by_id = {agent.id: agent for agent in agents}
+    
+    # We stagger the starting time of each case realistically so they interleave nicely
+    # E.g. start at some base time + case_index * 20 minutes
+    base_time = datetime.now() - timedelta(days=2)
+    case_start_time = base_time + timedelta(minutes=case_index * 20 + random.randint(0, 10))
+    current_time = case_start_time
 
-# Hard safety cap: regardless of caseCount, never make more than this many
-# coordinator iterations in a single run.
-# Increased to 200 to allow longer cases and larger runs to finish naturally.
-MAX_TOTAL_ITERATIONS_HARD_CAP = 200
+    for step in range(max_events_per_case):
+        # 1. Check if the case is structurally finished
+        if is_process_finished(case_id, wrapper_events, terminal_actions, max_events_per_case, transitions):
+            break
+
+        process_events = get_events_for_process(case_id, wrapper_events)
+        business_events = get_business_events(process_events)
+        case_data = collect_case_data(process_events)
+        
+        last_action = get_last_action(process_events)
+        allowed_next = get_allowed_next_actions(transitions, last_action) if transitions else []
+
+        # If BPMN mode, and there are no allowed next actions (or only END), we stop
+        if transitions is not None:
+            if not allowed_next or allowed_next == ["END"] or allowed_next == ["end"]:
+                break
+
+        assigned_agent_id = None
+        assigned_action = None
+        coordinator_msg = "Please proceed with the next step."
+
+        # OPTIMIZATION (Bypassing redundant Coordinator LLM calls for linear paths):
+        # If we have a transitions map and there is only ONE allowed next action (excluding END),
+        # we can route it programmatically in Python, saving a coordinator LLM call!
+        if transitions is not None and len(allowed_next) == 1 and allowed_next[0].upper() != "END":
+            candidate_action = allowed_next[0]
+            # Find the agent configured to perform this action
+            for agent in agents:
+                if any(act.strip().lower() == candidate_action.strip().lower() for act in agent.actions):
+                    assigned_agent_id = agent.id
+                    assigned_action = candidate_action
+                    break
+
+        # If programmatic routing succeeded, we bypass the coordinator LLM!
+        if assigned_agent_id and assigned_action:
+            pass
+        else:
+            # Otherwise (LLM-based mode, or multiple choices/branches at a gateway), call the Coordinator LLM:
+            state_info = {
+                "process_id": case_id,
+                "process_state": describe_process_state(business_events, case_data),
+                "case_data": case_data,
+                "number_of_events": len(business_events),
+                "allowed_next_actions": allowed_next,
+            }
+            
+            try:
+                assignment = coordinator.assign_agent_project(
+                    llm=llm,
+                    process_states=[state_info],
+                    agents=[agent.model_dump() for agent in agents],
+                    process_summary=config.process.description
+                )
+                assigned_agent_id = assignment.agent_id
+                coordinator_msg = assignment.message or "Please proceed with the next step."
+            except Exception as e:
+                print(f"Coordinator error in {case_id} step {step}: {e}")
+                break
+
+        # Get the assigned agent object
+        agent = agents_by_id.get(assigned_agent_id)
+        if not agent:
+            # Fallback: if coordinator returned a role name instead of an agent ID, try finding by role/name
+            for a in agents:
+                if a.role.strip().lower() == assigned_agent_id.strip().lower() or a.name.strip().lower() == assigned_agent_id.strip().lower():
+                    agent = a
+                    break
+            if not agent:
+                print(f"Agent/Role '{assigned_agent_id}' not found for case {case_id}")
+                break
+
+        # Prepare context for the agent actor
+        current_process = {
+            "process_id": case_id,
+            "process_state": describe_process_state(business_events, case_data),
+            "case_data": case_data,
+            "previous_events": process_events,
+            "coordinator_message": coordinator_msg,
+            "allowed_next_actions": allowed_next,
+        }
+
+        sim_context = {
+            "process": {
+                "summary": config.process.description,
+                "action_data_mapping": "No specific mapping provided.",
+                "event_data_attributes": [attr.model_dump() for attr in config.attributes]
+            }
+        }
+
+        # Call get_process_context to format descriptions correctly
+        formatted_context = get_process_context(sim_context)
+
+        # 4. Invoke agent actor LLM to generate the event details (attributes & feedback)
+        try:
+            generated_event: GeneratedEvent = agent.generate_single_event(
+                process_context=formatted_context,
+                current_process=current_process,
+                llm=llm,
+            )
+        except Exception as e:
+            print(f"Actor error in {case_id} step {step}: {e}")
+            break
+
+        ev_data = generated_event.model_dump()
+        ev_data["agent_id"] = agent.id
+        
+        if assigned_action:
+            ev_data["action"] = assigned_action
+        else:
+            # Normalize action name to match allowed actions or agent's own actions case-insensitively
+            original_action = ev_data["action"]
+            normalized = False
+            
+            # 1. Match against allowed next actions
+            if allowed_next:
+                for act in allowed_next:
+                    if original_action.strip().lower() == act.strip().lower():
+                        ev_data["action"] = act
+                        normalized = True
+                        break
+            
+            # 2. Match against agent's own actions
+            if not normalized and agent.actions:
+                for act in agent.actions:
+                    if original_action.strip().lower() == act.strip().lower():
+                        ev_data["action"] = act
+                        normalized = True
+                        break
+
+        # If in BPMN mode, override is_terminal based on the actual BPMN transition
+        if transitions is not None:
+            next_after_current = get_allowed_next_actions(transitions, ev_data["action"])
+            if "END" in next_after_current or "end" in next_after_current or not next_after_current:
+                ev_data["is_terminal"] = True
+            else:
+                ev_data["is_terminal"] = False
+
+        # Calculate event timestamps
+        # Each step takes 15-45 minutes
+        current_time += timedelta(minutes=random.randint(15, 45))
+        ev_data["timestamp"] = current_time.isoformat()
+
+        case_events.append(ev_data)
+
+    return case_events
 
 
 def generate_event_log(
     config: Any, # SimulationRunConfig
     max_events_per_case: int = 10,
-):
-
-
+) -> List[dict]:
     # Prepare agents
     agents = build_agents_from_config(config.agents)
-    agents_by_id = {agent.id: agent for agent in agents}
-
-    # Create empty event log structure
-    case_count = config.simulation.caseCount
-    events_by_case = [
-        {
-            "process_id": f"CASE-{i+1:04d}",
-            "events": [],
-        }
-        for i in range(case_count)
-    ]
-
     coordinator = Coordinator()
 
     # Extract terminal actions or use defaults
@@ -77,7 +220,6 @@ def generate_event_log(
     transitions: Optional[Dict[str, Any]] = None
 
     # BPMN mode: parse the uploaded .bpmn content and use its transitions
-    # and terminal actions to constrain the simulation.
     bpmn_file = getattr(config.process, "bpmnFile", None)
     if (
         getattr(config.process, "mode", None) == "BPMN_BASED"
@@ -112,153 +254,47 @@ def generate_event_log(
                         actions=actions,
                         age=None
                     ))
-                agents_by_id = {agent.id: agent for agent in agents}
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
-    process_ids = [case["process_id"] for case in events_by_case]
-    
-    # Create a process context compatible with process.py expectations
-    sim_context = {
-        "process": {
-            "summary": config.process.description,
-            "action_data_mapping": "No specific mapping provided.", 
-            "event_data_attributes": [attr.model_dump() for attr in config.attributes]
+    # Initialize case identifiers
+    case_count = config.simulation.caseCount
+    process_ids = [f"CASE-{i+1:04d}" for i in range(case_count)]
+
+    # Simulate all cases in parallel using ThreadPoolExecutor
+    # 15 threads balances concurrent throughput and gateway request limits nicely
+    simulated_cases = {}
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        futures = {
+            executor.submit(
+                simulate_single_case,
+                pid,
+                idx,
+                config,
+                agents,
+                transitions,
+                terminal_actions,
+                max_events_per_case,
+                coordinator
+            ): pid
+            for idx, pid in enumerate(process_ids)
         }
-    }
+        for future in futures:
+            pid = futures[future]
+            try:
+                simulated_cases[pid] = future.result()
+            except Exception as e:
+                print(f"Error simulating case {pid}: {e}")
+                simulated_cases[pid] = []
 
-    max_total_events = min(
-        len(process_ids) * max_events_per_case,
-        MAX_TOTAL_ITERATIONS_HARD_CAP,
-    )
-
-    for step_index in range(max_total_events):
-        # Get unfinished cases (cases that already reached max_events_per_case
-        # events are auto-finished here to prevent the coordinator from
-        # looping on the same case forever — the structural fix for the
-        # "agents talking in circles" scenario).
-        unfinished_process_states = get_unfinished_process_states(
-            process_ids=process_ids,
-            events=events_by_case,
-            terminal_actions=terminal_actions,
-            transitions=transitions,
-            max_events_per_case=max_events_per_case,
-        )
-
-        if not unfinished_process_states:
-            print("--- All cases finished naturally ---")
-            break
-
-        # Shuffle to prevent "batching" behavior and introduce randomness
-        random.shuffle(unfinished_process_states)
-
-        # Limit to max 10 states to prevent prompt bloat and LLM confusion
-        coordinator_states = unfinished_process_states[:10]
-
-        # 2. Call coordinator to assign ONE case to ONE agent with fallback
-        try:
-            assignment = coordinator.assign_agent_project(
-                llm=llm,
-                process_states=coordinator_states,
-                agents=[agent.model_dump() for agent in agents],
-                process_summary=config.process.description
-            )
-            
-            # Validate coordinator output
-            process_ids_set = {state["process_id"] for state in coordinator_states}
-            agent_ids_set = {agent.id for agent in agents}
-            
-            if assignment.process_id not in process_ids_set or assignment.agent_id not in agent_ids_set:
-                raise ValueError("Coordinator returned invalid process_id or agent_id")
-                
-        except Exception as e:
-            # If we never produced an event, the run is a total failure —
-            # re-raise so the caller marks status="failed" with a useful
-            # message instead of silently returning an empty list.
-            has_any_events = any(case["events"] for case in events_by_case)
-            if not has_any_events:
-                raise RuntimeError(f"Coordinator failed on first step: {e}") from e
-            # Partial data already collected — keep it and stop the loop.
-            print(f"Coordinator error (stopping early with partial data): {e}")
-            break
-
-        # Prepare context for the actor
-        current_process = get_current_process(
-            process_id=assignment.process_id,
-            events=events_by_case,
-        )
-        current_process["coordinator_message"] = assignment.message or "Please proceed with the next step."
-        
-        # Calculate allowed next actions to pass to the agent
-        allowed_next = (
-            get_allowed_next_actions(transitions, get_last_action(current_process.get("previous_events", [])))
-            if transitions
-            else []
-        )
-        current_process["allowed_next_actions"] = allowed_next
-
-        agent = agents_by_id[assignment.agent_id]
-        try:
-            generated_event: GeneratedEvent = agent.generate_single_event(
-                process_context=get_process_context(sim_context),
-                current_process=current_process,
-                llm=llm,
-            )
-
-            # Add to our internal tracking
-            ev_data = generated_event.model_dump()
-            ev_data["agent_id"] = agent.id
-
-            # Normalize action name to match allowed actions or agent's own actions case-insensitively
-            original_action = ev_data["action"]
-            normalized = False
-            
-            # 1. Match against allowed next actions
-            if allowed_next:
-                for act in allowed_next:
-                    if original_action.strip().lower() == act.strip().lower():
-                        ev_data["action"] = act
-                        normalized = True
-                        break
-            
-            # 2. Match against agent's own actions
-            if not normalized and agent.actions:
-                for act in agent.actions:
-                    if original_action.strip().lower() == act.strip().lower():
-                        ev_data["action"] = act
-                        normalized = True
-                        break
-
-            # If in BPMN mode, override is_terminal based on the actual BPMN transition
-            if transitions is not None:
-                next_after_current = get_allowed_next_actions(transitions, ev_data["action"])
-                if "END" in next_after_current or "end" in next_after_current or not next_after_current:
-                    ev_data["is_terminal"] = True
-                else:
-                    ev_data["is_terminal"] = False
-            
-            # Advance timestamp by 15-45 minutes per step for realism
-            prev_events = current_process.get("previous_events", [])
-            if prev_events:
-                last_time = datetime.fromisoformat(prev_events[-1].get("timestamp"))
-                new_time = last_time + timedelta(minutes=random.randint(15, 45))
-            else:
-                # Base starting time for the very first event of a case
-                new_time = datetime.now() + timedelta(minutes=step_index * 5)
-            
-            ev_data["timestamp"] = new_time.isoformat()
-            append_event_to_process(events_by_case, assignment.process_id, ev_data)
-            
-        except Exception as e:
-            print(f"Actor error: {e}")
-            continue
-
-    # Flatten everything for the final output display format
+    # Flatten everything for the final output display format and collect attributes
     final_events = []
-    for case in events_by_case:
-        p_id = case["process_id"]
-        for ev in case["events"]:
+    agents_by_id = {agent.id: agent for agent in agents}
+
+    for pid in process_ids:
+        events = simulated_cases.get(pid, [])
+        for ev in events:
             agent_obj = agents_by_id.get(ev.get("agent_id"))
             
             # Combine attributes from both event_data and case_data for safety
@@ -271,7 +307,7 @@ def generate_event_log(
                         combined_attributes[attr.attribute] = attr.value
             
             final_events.append({
-                "caseId": p_id,
+                "caseId": pid,
                 "activity": ev["action"],
                 "timestamp": ev.get("timestamp", datetime.now().isoformat()),
                 "is_terminal": ev.get("is_terminal", False),
@@ -281,5 +317,7 @@ def generate_event_log(
                 "attributes": combined_attributes
             })
 
-    return final_events
+    # Sort final event log by timestamp to ensure realistic, interleaved event history
+    final_events.sort(key=lambda x: x["timestamp"])
 
+    return final_events
