@@ -64,6 +64,7 @@ def compute_stats(
     ]
 
     custom_attr_names: List[str] = []
+    custom_attr_scopes: Dict[str, str] = {}
     if config_snapshot:
         for attr in config_snapshot.get("attributes") or []:
             name = attr.get("name")
@@ -73,6 +74,7 @@ def compute_stats(
                 and name not in ESSENTIAL_ATTRIBUTE_NAMES
             ):
                 custom_attr_names.append(name)
+                custom_attr_scopes[name] = attr.get("scope", "event")
 
     attribute_distribution: List[Dict[str, Any]] = []
     for name in custom_attr_names:
@@ -84,6 +86,7 @@ def compute_stats(
         if value_counter:
             attribute_distribution.append({
                 "name": name,
+                "scope": custom_attr_scopes.get(name, "event"),
                 "values": [
                     {"value": value, "count": count}
                     for value, count in value_counter.most_common(20)

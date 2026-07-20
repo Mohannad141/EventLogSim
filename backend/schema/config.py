@@ -21,6 +21,7 @@ class AttributeConfig(BaseModel):
     type: str  # "string", "number", "datetime"
     description: Optional[str] = None
     locked: bool = False
+    scope: str = "event"  # "event" or "case"
 
 class SimulationConfig(BaseModel):
     caseCount: int = Field(ge=1, le=10000) # ge = greater than or equal, le = less than or equal

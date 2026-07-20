@@ -118,12 +118,12 @@ export const useConfigState = () => {
   const addAttribute = useCallback(
     (attrData = {}) =>
       update((c) => {
-        const { name = '', type = 'string', description = '' } = attrData;
+        const { name = '', type = 'string', description = '', scope = 'event' } = attrData;
         return {
           ...c,
           attributes: [
             ...c.attributes,
-            { id: generateId(), name, type, description, locked: false },
+            { id: generateId(), name, type, description, locked: false, scope },
           ],
         };
       }),

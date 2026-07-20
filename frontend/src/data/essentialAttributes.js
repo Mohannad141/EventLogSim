@@ -5,13 +5,14 @@ export const ESSENTIAL_ATTRIBUTE_IDS = [
 ];
 
 export const createEssentialAttributes = () => [
-  { id: 'essential-caseId', name: 'caseId', type: 'string', locked: true },
-  { id: 'essential-activity', name: 'activity', type: 'string', locked: true },
+  { id: 'essential-caseId', name: 'caseId', type: 'string', locked: true, scope: 'case' },
+  { id: 'essential-activity', name: 'activity', type: 'string', locked: true, scope: 'event' },
   {
     id: 'essential-timestamp',
     name: 'timestamp',
     type: 'datetime',
     locked: true,
+    scope: 'event',
   },
 ];
 

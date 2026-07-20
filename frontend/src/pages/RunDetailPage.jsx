@@ -103,27 +103,42 @@ const RunDetailPage = () => {
             />
           </Card>
 
+          <Card>
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">
+              Event Distribution
+            </h2>
+            <EventDistributionChart
+              data={run.stats?.eventDistribution || []}
+            />
+          </Card>
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-  <Card>
-    <h2 className="mb-3 text-lg font-semibold text-gray-900">
-      Event Distribution
-    </h2>
-    <EventDistributionChart
-      data={run.stats?.eventDistribution || []}
-    />
-  </Card>
+            <Card>
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
+                Event Attributes Distribution
+              </h2>
+              <AttributeDistributionChart
+                attributes={(run.stats?.attributeDistribution || []).filter(
+                  (a) => (a.scope || 'event') === 'event'
+                )}
+                emptyMessage="No event-scoped custom attributes."
+                showSelector
+              />
+            </Card>
 
-  <Card>
-    <h2 className="mb-3 text-lg font-semibold text-gray-900">
-      Attribute Distribution
-    </h2>
-
-    <AttributeDistributionChart
-      attributes={run.stats?.attributeDistribution || []}
-     showSelector
-    />
-  </Card>
-</div>
+            <Card>
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
+                Case Attributes Distribution
+              </h2>
+              <AttributeDistributionChart
+                attributes={(run.stats?.attributeDistribution || []).filter(
+                  (a) => a.scope === 'case'
+                )}
+                emptyMessage="No case-scoped custom attributes."
+                showSelector
+              />
+            </Card>
+          </div>
 
           <Card>
             <h2 className="mb-3 text-lg font-semibold text-gray-900">
